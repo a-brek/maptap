@@ -340,57 +340,6 @@ async function fetchPuzzle() {
   return res.json();
 }
 
-async function fetchUnlimitedPuzzle() {
-  const res = await fetch('/api/puzzle/unlimited');
-  if (!res.ok) throw new Error(`Server returned ${res.status}`);
-  return res.json();
-}
-
-// ── Unlimited Mode ──────────────────────────────────────────
-function resetGameState() {
-  clearTimeout(_nextRoundTimer);
-  _nextRoundTimer = null;
-  state.round        = 0;
-  state.totalScore   = 0;
-  state.roundScores  = [];
-  state.pendingGuess = null;
-  state.markers      = [];
-  state.arcs         = [];
-  state.labels       = [];
-  state.rings        = [];
-  state.gameOver     = false;
-  state.hintVisible  = false;
-
-  globe.pointsData([]);
-  globe.ringsData([]);
-  globe.arcsData([]);
-  globe.labelsData([...OCEAN_LABELS]);
-  globe.polygonsData([]);
-  globe.pointOfView(randomGlobeView(), 800);
-
-  const scoreEl = qs('#score-display');
-  scoreEl.textContent = '0';
-}
-
-async function startUnlimitedMode() {
-  // Hide game-over overlay if showing
-  const overlay = qs('#game-over');
-  overlay.classList.remove('visible');
-  overlay.setAttribute('hidden', '');
-
-  state.mode = 'unlimited';
-  resetGameState();
-
-  try {
-    const puzzle   = await fetchUnlimitedPuzzle();
-    state.puzzle   = puzzle;
-    state.date     = puzzle.date;
-    showCluePanel();
-  } catch (err) {
-    console.error('Failed to fetch unlimited puzzle:', err);
-  }
-}
-
 async function revealLocation(date, roundIndex, lat, lng) {
   const res = await fetch(`/api/puzzle/${date}/reveal/${roundIndex}`, {
     method: 'POST',
@@ -401,6 +350,42 @@ async function revealLocation(date, roundIndex, lat, lng) {
   return res.json(); // { actual: {lat,lng,name}, distanceKm, score }
 }
 
+// ── Marker Drop Animation ──────────────────────────────────
+function dropMarker(markerId, targetAlt, targetSize, onLand) {
+  const START_ALT = 1.6;
+  const DURATION  = 520;
+  const start     = performance.now();
+
+  function tick(now) {
+    const t      = Math.min((now - start) / DURATION, 1);
+    const eased  = t * t * t;                          // ease-in cubic — gravity feel
+    const alt    = START_ALT + (targetAlt - START_ALT) * eased;
+
+    state.markers = state.markers.map(m =>
+      m.id === markerId ? { ...m, altitude: alt } : m
+    );
+    globe.pointsData([...state.markers]);
+
+    if (t < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      // Impact burst — briefly enlarge then snap back
+      state.markers = state.markers.map(m =>
+        m.id === markerId ? { ...m, size: targetSize * 2.8 } : m
+      );
+      globe.pointsData([...state.markers]);
+      setTimeout(() => {
+        state.markers = state.markers.map(m =>
+          m.id === markerId ? { ...m, size: targetSize } : m
+        );
+        globe.pointsData([...state.markers]);
+        if (onLand) onLand();
+      }, 120);
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
 // ── Globe Click ────────────────────────────────────────────
 function handleGlobeClick(lat, lng) {
   if (state.gameOver || !state.puzzle) return;
@@ -408,8 +393,10 @@ function handleGlobeClick(lat, lng) {
   // Replace any pending marker
   state.markers = state.markers.filter(m => m.id !== 'pending');
   state.pendingGuess = { lat, lng };
-  state.markers.push({ id: 'pending', lat, lng, color: '#e89620', size: 0.25, altitude: 0.12 });
+  // Start high — dropMarker will animate it down
+  state.markers.push({ id: 'pending', lat, lng, color: '#e89620', size: 0.25, altitude: 1.6 });
   globe.pointsData([...state.markers]);
+  dropMarker('pending', 0.12, 0.25);
 
   // Reveal confirm button
   const btn = qs('#confirm-btn');
@@ -448,13 +435,17 @@ async function confirmGuess() {
     // Fly globe toward actual location while UFO is en route
     globe.pointOfView({ lat: actual.lat, lng: actual.lng, altitude: 1.8 }, 1200);
 
-    // Drop the actual-location pin, arc, label
+    // Drop the actual-location pin from space, then trigger ring on land
+    const actualId = `actual-${state.round}`;
     state.markers.push({
-      id: `actual-${state.round}`,
+      id: actualId,
       lat: actual.lat, lng: actual.lng,
-      color: '#00c9a7', size: 0.28, altitude: 0.06,
+      color: '#00c9a7', size: 0.28, altitude: 1.6,
     });
-    state.rings.push({ lat: actual.lat, lng: actual.lng });
+    dropMarker(actualId, 0.06, 0.28, () => {
+      state.rings.push({ lat: actual.lat, lng: actual.lng });
+      globe.ringsData([...state.rings]);
+    });
     state.arcs.push({
       startLat: lat, startLng: lng,
       endLat: actual.lat, endLng: actual.lng,
@@ -464,7 +455,6 @@ async function confirmGuess() {
 
     const world = state.puzzle.locations[state.round]?.world || 'earth';
     globe.pointsData([...state.markers]);
-    globe.ringsData([...state.rings]);
     globe.arcsData([...state.arcs]);
     globe.labelsData([
       ...(WORLD_CONFIG[world]?.showOceans ? OCEAN_LABELS : []),
@@ -610,7 +600,6 @@ function nextRound() {
 
 // ── localStorage persistence ───────────────────────────────
 function saveResultLocally() {
-  if (state.mode === 'unlimited') return;
   try {
     localStorage.setItem(`tapmap-result-${state.date}`, JSON.stringify({
       totalScore:  state.totalScore,
@@ -629,11 +618,9 @@ function loadResultLocally(date) {
 // ── Game Over ──────────────────────────────────────────────
 function showGameOver(skipSave = false) {
   state.gameOver = true;
-  const isUnlimited = state.mode === 'unlimited';
 
   if (!skipSave) saveResultLocally();
 
-  qs('#game-over-title').textContent = isUnlimited ? 'Unlimited Mode' : 'Today\'s Results';
   qs('#final-score').textContent = state.totalScore.toLocaleString();
   qs('#score-grade').textContent = scoreGrade(state.totalScore);
 
@@ -651,30 +638,15 @@ function showGameOver(skipSave = false) {
     </div>`;
   }).join('');
 
-  // Share text / play-again toggle
-  if (isUnlimited) {
-    qs('#share-text').hidden = true;
-    qs('#copy-btn').setAttribute('hidden', '');
-    qs('#play-again-btn').removeAttribute('hidden');
-    qs('#go-unlimited-btn').setAttribute('hidden', '');
-    qs('#countdown-section').setAttribute('hidden', '');
-    qs('#player-rank').setAttribute('hidden', '');
-  } else {
-    const grid = state.roundScores.map(r => r.emoji).join('');
-    const shareText = [
-      `Tap Map ${state.date}`,
-      grid,
-      `tapmap.onrender.com`,
-      `Total Score: ${state.totalScore}/500`,
-    ].join('\n');
-    qs('#share-text').hidden = false;
-    qs('#share-text').textContent = shareText;
-    qs('#copy-btn').removeAttribute('hidden');
-    qs('#play-again-btn').setAttribute('hidden', '');
-    qs('#go-unlimited-btn').removeAttribute('hidden');
-    qs('#countdown-section').removeAttribute('hidden');
-    startCountdown();
-  }
+  // Share text (Wordle-style)
+  const grid = state.roundScores.map(r => r.emoji).join('');
+  const shareText = [
+    `Tap Map ${state.date}`,
+    grid,
+    `tapmap.onrender.com`,
+    `Total Score: ${state.totalScore}/500`,
+  ].join('\n');
+  qs('#share-text').textContent = shareText;
 
   // Show overlay
   const overlay = qs('#game-over');
@@ -683,8 +655,10 @@ function showGameOver(skipSave = false) {
     requestAnimationFrame(() => overlay.classList.add('visible'));
   });
 
+  startCountdown();
+
   // Save score + show rank (async — updates UI when server responds)
-  if (!skipSave && !isUnlimited) {
+  if (!skipSave) {
     Auth.saveScore(state.date, state.totalScore, state.roundScores).then(rank => {
       if (rank !== null) showRank(rank);
     });
@@ -878,9 +852,6 @@ async function init() {
   qs('#next-btn').addEventListener('click', nextRound);
   qs('#hint-toggle').addEventListener('click', toggleHint);
   qs('#copy-btn').addEventListener('click', copyShareText);
-  qs('#unlimited-btn').addEventListener('click', startUnlimitedMode);
-  qs('#play-again-btn').addEventListener('click', startUnlimitedMode);
-  qs('#go-unlimited-btn').addEventListener('click', startUnlimitedMode);
 
   // Auth init and puzzle fetch run in parallel
   try {
@@ -891,7 +862,6 @@ async function init() {
 
     state.puzzle = puzzle;
     state.date   = puzzle.date;
-    state.mode   = 'daily';
 
     // Check if this puzzle was already completed today
     const saved = loadResultLocally(puzzle.date);
