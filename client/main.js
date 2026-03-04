@@ -505,9 +505,28 @@ function nextRound() {
   }, 320);
 }
 
+// ── localStorage persistence ───────────────────────────────
+function saveResultLocally() {
+  try {
+    localStorage.setItem(`tapmap-result-${state.date}`, JSON.stringify({
+      totalScore:  state.totalScore,
+      roundScores: state.roundScores,
+    }));
+  } catch (_) {}
+}
+
+function loadResultLocally(date) {
+  try {
+    const raw = localStorage.getItem(`tapmap-result-${date}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) { return null; }
+}
+
 // ── Game Over ──────────────────────────────────────────────
-function showGameOver() {
+function showGameOver(skipSave = false) {
   state.gameOver = true;
+
+  if (!skipSave) saveResultLocally();
 
   qs('#final-score').textContent = state.totalScore.toLocaleString();
   qs('#score-grade').textContent = scoreGrade(state.totalScore);
@@ -545,9 +564,11 @@ function showGameOver() {
   startCountdown();
 
   // Save score + show rank (async — updates UI when server responds)
-  Auth.saveScore(state.date, state.totalScore, state.roundScores).then(rank => {
-    if (rank !== null) showRank(rank);
-  });
+  if (!skipSave) {
+    Auth.saveScore(state.date, state.totalScore, state.roundScores).then(rank => {
+      if (rank !== null) showRank(rank);
+    });
+  }
 }
 
 function showRank(rank) {
@@ -748,6 +769,14 @@ async function init() {
     state.puzzle = puzzle;
     state.date   = puzzle.date;
 
+    // Check if this puzzle was already completed today
+    const saved = loadResultLocally(puzzle.date);
+    if (saved) {
+      state.totalScore  = saved.totalScore;
+      state.roundScores = saved.roundScores;
+      state.round       = 5;
+    }
+
     // Dismiss loading screen, then show auth modal if needed
     const loading = qs('#loading');
     loading.classList.add('fade-out');
@@ -756,8 +785,13 @@ async function init() {
       Auth.onGameReady(authUser);
     }, { once: true });
 
-    // Show first clue after short delay (globe is animating in)
-    setTimeout(() => showCluePanel(), 650);
+    if (saved) {
+      // Already played — go straight to results
+      setTimeout(() => showGameOver(true), 650);
+    } else {
+      // Show first clue after short delay (globe is animating in)
+      setTimeout(() => showCluePanel(), 650);
+    }
 
   } catch (err) {
     console.error('Failed to load puzzle:', err);
