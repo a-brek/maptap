@@ -59,7 +59,7 @@ const DATE_OVERRIDES = {
     { name: 'Mexico City, Mexico',             lat: 19.4326,  lng: -99.1332,  tier: 1 },
     { name: 'Cape Town, South Africa',         lat: -33.9249, lng: 18.4241,   tier: 2 },
     { name: 'Minsk, Belarus',                  lat: 53.9045,  lng: 27.5615,   tier: 3 },
-    { name: "Little St. James Island (👀)",    lat: 18.2986,  lng: -64.8999,  tier: 4 },
+    { name: 'Epstein Island',                  lat: 18.2986,  lng: -64.8999,  tier: 4 },
     { name: 'Bouvet Island, Norway',           lat: -54.4208, lng: 3.3464,    tier: 5 },
   ],
 };
