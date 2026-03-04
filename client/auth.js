@@ -1,5 +1,5 @@
 /* ============================================================
-   MapTap — Auth Module
+   Tap Map — Auth Module
    Exposes window.Auth
    ============================================================ */
 
@@ -240,13 +240,12 @@ window.Auth = (() => {
       e.preventDefault();
       const btn      = qs('#signup-submit');
       const username = qs('#signup-username').value.trim();
-      const email    = qs('#signup-email').value.trim();
       const pass     = qs('#signup-password').value;
       btn.disabled = true; btn.textContent = 'Creating…';
 
       const data = await apiFetch('/api/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ username, email, password: pass }),
+        body: JSON.stringify({ username, password: pass }),
       });
 
       btn.disabled = false; btn.textContent = 'Create Account';

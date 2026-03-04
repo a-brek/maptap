@@ -1,5 +1,5 @@
 /* ============================================================
-   MapTap — Game Logic
+   Tap Map — Game Logic
    Globe: globe.gl (window.Globe via CDN)
    API:   /api/puzzle/*
    ============================================================ */
@@ -65,6 +65,83 @@ function animateCounter(el, from, to, duration = 700) {
   requestAnimationFrame(tick);
 }
 
+// ── Ocean Labels (trash talk) ───────────────────────────────
+const OCEAN_LABELS = [
+  { ocean: true, lat:  5,  lng: -30,  text: 'ATLANTIC OCEAN\nskill issue tbh',        color: 'rgba(100,180,255,0.28)' },
+  { ocean: true, lat: -5,  lng: -145, text: 'PACIFIC OCEAN\nyou would drown here',    color: 'rgba(100,180,255,0.28)' },
+  { ocean: true, lat: -20, lng:  75,  text: 'INDIAN OCEAN\nnot even on the map lol',  color: 'rgba(100,180,255,0.28)' },
+  { ocean: true, lat: -60, lng:   0,  text: 'SOUTHERN OCEAN\nyour score lives here',  color: 'rgba(100,180,255,0.28)' },
+  { ocean: true, lat:  80, lng:   0,  text: 'ARCTIC OCEAN\ncold like ur geography',   color: 'rgba(100,180,255,0.28)' },
+];
+
+// ── UFO ────────────────────────────────────────────────────
+const UFO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="13" viewBox="0 0 52 36" style="filter:drop-shadow(0 0 4px #7df)">
+  <defs>
+    <radialGradient id="domeGrad" cx="40%" cy="30%">
+      <stop offset="0%" stop-color="#e0f8ff"/>
+      <stop offset="100%" stop-color="#4ad" stop-opacity="0.7"/>
+    </radialGradient>
+    <radialGradient id="bodyGrad" cx="50%" cy="35%">
+      <stop offset="0%" stop-color="#c8d8e8"/>
+      <stop offset="100%" stop-color="#6688aa"/>
+    </radialGradient>
+  </defs>
+  <!-- saucer body -->
+  <ellipse cx="26" cy="22" rx="22" ry="8" fill="url(#bodyGrad)" stroke="#aac" stroke-width="0.8"/>
+  <!-- rim glow -->
+  <ellipse cx="26" cy="22" rx="22" ry="8" fill="none" stroke="rgba(130,220,255,0.5)" stroke-width="2"/>
+  <!-- dome -->
+  <ellipse cx="26" cy="17" rx="10" ry="9" fill="url(#domeGrad)" stroke="#9de" stroke-width="0.8"/>
+  <!-- lights -->
+  <circle class="ufo-l1" cx="10" cy="24" r="2.5" fill="#ff0" opacity="0.9"/>
+  <circle class="ufo-l2" cx="19" cy="28" r="2.5" fill="#0ff" opacity="0.9"/>
+  <circle class="ufo-l3" cx="26" cy="29" r="2.5" fill="#ff0" opacity="0.9"/>
+  <circle class="ufo-l4" cx="33" cy="28" r="2.5" fill="#0ff" opacity="0.9"/>
+  <circle class="ufo-l5" cx="42" cy="24" r="2.5" fill="#ff0" opacity="0.9"/>
+</svg>`;
+
+// Blink the UFO lights via CSS in the main document
+(function injectUfoStyle() {
+  const s = document.createElement('style');
+  s.textContent = `
+    @keyframes ufo-blink-a { 0%,49%{opacity:0.9} 50%,100%{opacity:0.15} }
+    @keyframes ufo-blink-b { 0%,49%{opacity:0.15} 50%,100%{opacity:0.9} }
+    .ufo-l1,.ufo-l3,.ufo-l5 { animation: ufo-blink-a 0.8s infinite; }
+    .ufo-l2,.ufo-l4          { animation: ufo-blink-b 0.8s infinite; }
+  `;
+  document.head.appendChild(s);
+})();
+
+function startUfoOrbit() {
+  const INCLINATION = 12; // gentle drift, not a dramatic sine wave
+  const SPEED = 0.06;     // slow cruise
+
+  const el = document.createElement('div');
+  el.style.cssText = 'pointer-events:none;transform:translate(-50%,-50%);';
+  el.innerHTML = UFO_SVG;
+
+  const shadowEl = document.createElement('div');
+  shadowEl.style.cssText = 'pointer-events:none;transform:translate(-50%,-50%);width:14px;height:5px;border-radius:50%;background:radial-gradient(ellipse,rgba(0,0,0,0.82) 0%,transparent 70%);';
+
+  // Two entries: shadow on surface, UFO above
+  const ufoData = [
+    { lat: 0, lng: 0, el: shadowEl, alt: 0.001 },
+    { lat: 0, lng: 0, el,           alt: 0.08  },
+  ];
+  let angle = 0;
+
+  function tick() {
+    angle += SPEED; // unbounded — no modulo so no antimeridian jump
+    const lat = INCLINATION * Math.sin(angle * Math.PI / 180 * 0.6);
+    const lng = angle % 360 - 180;
+    ufoData[0].lat = ufoData[1].lat = lat;
+    ufoData[0].lng = ufoData[1].lng = lng;
+    globe.htmlElementsData([...ufoData]);
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
 // ── Globe Setup ────────────────────────────────────────────
 function randomGlobeView(altitude = 2.2) {
   return {
@@ -110,16 +187,23 @@ function initGlobe() {
     .arcDashGap(0.12)
     .arcDashAnimateTime(2400)
     .arcStroke(0.45)
-    // Labels
-    .labelsData([])
+    // Labels (ocean labels + game labels merged; ocean labels have no dot)
+    .labelsData([...OCEAN_LABELS])
     .labelLat('lat')
     .labelLng('lng')
     .labelText('text')
-    .labelSize(0.75)
+    .labelSize(d => d.ocean ? 0.55 : 0.75)
     .labelColor('color')
-    .labelDotRadius(0.32)
-    .labelIncludeDot(true)
+    .labelDotRadius(d => d.ocean ? 0 : 0.32)
+    .labelIncludeDot(d => !d.ocean)
     .labelAltitude(0.025)
+    .labelResolution(3)
+    // HTML elements (UFO)
+    .htmlElementsData([])
+    .htmlLat('lat')
+    .htmlLng('lng')
+    .htmlAltitude('alt')
+    .htmlElement('el')
     // Country polygons (for post-reveal highlight)
     .polygonsData([])
     .polygonCapColor(() => 'rgba(0, 201, 167, 0.10)')
@@ -276,7 +360,7 @@ async function confirmGuess() {
 
     globe.pointsData([...state.markers]);
     globe.arcsData([...state.arcs]);
-    globe.labelsData([...state.labels]);
+    globe.labelsData([...OCEAN_LABELS, ...state.labels]);
 
     // Fly to actual location and highlight its country
     globe.pointOfView({ lat: actual.lat, lng: actual.lng, altitude: 1.8 }, 1400);
@@ -423,21 +507,25 @@ function showGameOver() {
 
   // Breakdown rows
   const breakdown = qs('#score-breakdown');
-  breakdown.innerHTML = state.roundScores.map((r, i) => `
+  breakdown.innerHTML = state.roundScores.map((r, i) => {
+    const km = r.distanceKm < 1 ? '<1' : Math.round(r.distanceKm).toLocaleString();
+    const label = r.locationName || `Location ${i + 1}`;
+    return `
     <div class="breakdown-row">
       <span class="breakdown-emoji">${r.emoji}</span>
-      <span class="breakdown-label">Location ${i + 1}</span>
+      <span class="breakdown-label">${label}</span>
+      <span class="breakdown-dist">${km} km off</span>
       <span class="breakdown-score">+${r.score}</span>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 
   // Share text (Wordle-style)
   const grid = state.roundScores.map(r => r.emoji).join('');
   const shareText = [
-    `MapTap ${state.date}`,
+    `Tap Map ${state.date}`,
     grid,
     `Score: ${state.totalScore}/5000`,
-    `maptap.gg`,
+    `tapmap.gg`,
   ].join('\n');
   qs('#share-text').textContent = shareText;
 
@@ -507,6 +595,7 @@ async function copyShareText() {
 // ── Init ───────────────────────────────────────────────────
 async function init() {
   initGlobe();
+  startUfoOrbit();
 
   // Wire up events
   qs('#confirm-btn').addEventListener('click', confirmGuess);

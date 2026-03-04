@@ -1,4 +1,4 @@
-# MapTap
+# TapMap
 
 A daily geography guessing game. Each day, 5 locations tied to historical events are
 revealed one at a time. Click the 3D globe where you think each event happened — scored

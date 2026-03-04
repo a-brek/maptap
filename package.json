@@ -1,5 +1,5 @@
 {
-  "name": "maptap",
+  "name": "tapmap",
   "version": "1.0.0",
   "description": "Daily geography guessing game with a 3D interactive globe",
   "main": "server/index.js",

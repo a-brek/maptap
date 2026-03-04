@@ -25,10 +25,10 @@ router.get('/me', (req, res) => {
 
 // ── POST /api/auth/register ───────────────────────────────
 router.post('/register', async (req, res) => {
-  const { email, password, username } = req.body ?? {};
+  const { password, username } = req.body ?? {};
 
-  if (!email || !password || !username)
-    return res.status(400).json({ error: 'Email, password, and username are required' });
+  if (!password || !username)
+    return res.status(400).json({ error: 'Username and password are required' });
 
   const trimmed = username.trim();
   if (trimmed.length < 3 || trimmed.length > 20)
@@ -39,20 +39,17 @@ router.post('/register', async (req, res) => {
   try {
     const hash   = await bcrypt.hash(password, 10);
     const result = await db.query(
-      'INSERT INTO users (email, username, password_hash) VALUES ($1, $2, $3) RETURNING *',
-      [email.toLowerCase().trim(), trimmed, hash]
+      'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING *',
+      [trimmed, hash]
     );
     const user = result.rows[0];
 
     req.logIn(user, err => {
       if (err) return res.status(500).json({ error: 'Session error' });
-      res.json({ user: { id: user.id, username: user.username, email: user.email } });
+      res.json({ user: { id: user.id, username: user.username } });
     });
   } catch (err) {
-    if (err.code === '23505') {  // unique_violation
-      const msg = err.constraint?.includes('email') ? 'Email already in use' : 'Username already taken';
-      return res.status(409).json({ error: msg });
-    }
+    if (err.code === '23505') return res.status(409).json({ error: 'Username already taken' });
     console.error(err);
     res.status(500).json({ error: 'Registration failed' });
   }
@@ -65,7 +62,7 @@ router.post('/login', (req, res, next) => {
     if (!user) return res.status(401).json({ error: info?.message || 'Invalid credentials' });
     req.logIn(user, err2 => {
       if (err2) return next(err2);
-      res.json({ user: { id: user.id, username: user.username, email: user.email } });
+      res.json({ user: { id: user.id, username: user.username } });
     });
   })(req, res, next);
 });

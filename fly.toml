@@ -1,5 +1,5 @@
-# fly.toml — MapTap Fly.io configuration
-app = "maptap"
+# fly.toml — Tap Map Fly.io configuration
+app = "tapmap"
 primary_region = "iad"  # US East — change to nearest: lhr=London, cdg=Paris, nrt=Tokyo, etc.
 
 [build]

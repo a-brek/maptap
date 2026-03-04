@@ -39,7 +39,7 @@ app.use(session({
     tableName: 'session',
     createTableIfMissing: true,
   }),
-  secret:            process.env.SESSION_SECRET || 'maptap-dev-secret-change-in-production',
+  secret:            process.env.SESSION_SECRET || 'tapmap-dev-secret-change-in-production',
   resave:            false,
   saveUninitialized: false,
   cookie: {
@@ -154,5 +154,5 @@ app.use((err, _req, res, _next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n  🌍  MapTap running at http://localhost:${PORT}\n`);
+  console.log(`\n  🌍  Tap Map running at http://localhost:${PORT}\n`);
 });
