@@ -600,11 +600,11 @@ function showGameOver(skipSave = false) {
     </div>`;
   }).join('');
 
-  // Share text (Wordle-style)
-  const grid = state.roundScores.map(r => r.emoji).join('');
+  // Share text
+  const scores = state.roundScores.map(r => r.score).join(' · ');
   const shareText = [
     `Tap Map ${state.date}`,
-    grid,
+    scores,
     `tapmap.onrender.com`,
     `Total Score: ${state.totalScore}/500`,
   ].join('\n');

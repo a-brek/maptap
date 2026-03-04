@@ -36,7 +36,7 @@ function haversine(lat1, lng1, lat2, lng2, R = 6371) {
 // Scoring
 // ---------------------------------------------------------------------------
 function calcScore(distKm, maxDist = 2000) {
-  return Math.round(100 * Math.max(0, 1 - distKm / maxDist));
+  return Math.round(100 * Math.max(0, Math.sqrt(Math.max(0, 1 - distKm / maxDist))));
 }
 
 // ---------------------------------------------------------------------------
@@ -99,18 +99,6 @@ function getLocationsForDate(dateStr) {
 }
 
 // ---------------------------------------------------------------------------
-// Unlimited mode — ephemeral in-memory sessions (auto-expire after 2 h)
-// ---------------------------------------------------------------------------
-const unlimitedSessions = new Map();
-
-function pruneOldSessions() {
-  const cutoff = Date.now() - 2 * 60 * 60 * 1000;
-  for (const [id, session] of unlimitedSessions) {
-    if (session.createdAt < cutoff) unlimitedSessions.delete(id);
-  }
-}
-
-// ---------------------------------------------------------------------------
 // GET /api/puzzle/today
 // ---------------------------------------------------------------------------
 router.get('/today', (req, res) => {
@@ -118,39 +106,6 @@ router.get('/today', (req, res) => {
   const locs  = getLocationsForDate(today);
   res.json({
     date:      today,
-    locations: locs.map(({ name, world }) => ({ name, world: world || 'earth' })),
-  });
-});
-
-// ---------------------------------------------------------------------------
-// GET /api/puzzle/unlimited  — generates a fresh random 5-location puzzle
-// ---------------------------------------------------------------------------
-router.get('/unlimited', (req, res) => {
-  pruneOldSessions();
-
-  const seed = Math.floor(Math.random() * 0xFFFFFFFF);
-  const rand = seededRng(seed);
-
-  const tiers = { 1: [], 2: [], 3: [], 4: [], 5: [] };
-  for (const loc of locations) {
-    if (tiers[loc.tier]) tiers[loc.tier].push(loc);
-  }
-
-  const locs = [];
-  for (let t = 1; t <= 5; t++) {
-    const shuffled = [...tiers[t]];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(rand() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    locs.push(shuffled[0]);
-  }
-
-  const sessionId = `u${seed.toString(36)}`;
-  unlimitedSessions.set(sessionId, { locs, createdAt: Date.now() });
-
-  res.json({
-    date:      sessionId,
     locations: locs.map(({ name, world }) => ({ name, world: world || 'earth' })),
   });
 });
@@ -188,16 +143,11 @@ router.post('/:date/reveal/:round', (req, res) => {
     return res.status(400).json({ error: 'round must be 0–4' });
   }
 
-  let locs;
-  if (unlimitedSessions.has(date)) {
-    locs = unlimitedSessions.get(date).locs;
-  } else {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      return res.status(400).json({ error: 'Invalid date format — use YYYY-MM-DD' });
-    }
-    locs = getLocationsForDate(date);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: 'Invalid date format — use YYYY-MM-DD' });
   }
 
+  const locs     = getLocationsForDate(date);
   const location = locs[roundIndex];
   if (!location) {
     return res.status(404).json({ error: 'Round not found' });
