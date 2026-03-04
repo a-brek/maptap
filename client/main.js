@@ -351,15 +351,15 @@ async function revealLocation(date, roundIndex, lat, lng) {
 }
 
 // ── Marker Drop Animation ──────────────────────────────────
-function dropMarker(markerId, targetAlt, targetSize, onLand) {
+function dropMarker(markerId, targetAlt, onLand) {
   const START_ALT = 1.6;
   const DURATION  = 520;
   const start     = performance.now();
 
   function tick(now) {
-    const t      = Math.min((now - start) / DURATION, 1);
-    const eased  = t * t * t;                          // ease-in cubic — gravity feel
-    const alt    = START_ALT + (targetAlt - START_ALT) * eased;
+    const t     = Math.min((now - start) / DURATION, 1);
+    const eased = t * t * t; // ease-in cubic — gravity feel
+    const alt   = START_ALT + (targetAlt - START_ALT) * eased;
 
     state.markers = state.markers.map(m =>
       m.id === markerId ? { ...m, altitude: alt } : m
@@ -368,19 +368,8 @@ function dropMarker(markerId, targetAlt, targetSize, onLand) {
 
     if (t < 1) {
       requestAnimationFrame(tick);
-    } else {
-      // Impact burst — briefly enlarge then snap back
-      state.markers = state.markers.map(m =>
-        m.id === markerId ? { ...m, size: targetSize * 2.8 } : m
-      );
-      globe.pointsData([...state.markers]);
-      setTimeout(() => {
-        state.markers = state.markers.map(m =>
-          m.id === markerId ? { ...m, size: targetSize } : m
-        );
-        globe.pointsData([...state.markers]);
-        if (onLand) onLand();
-      }, 120);
+    } else if (onLand) {
+      onLand();
     }
   }
   requestAnimationFrame(tick);
@@ -396,7 +385,7 @@ function handleGlobeClick(lat, lng) {
   // Start high — dropMarker will animate it down
   state.markers.push({ id: 'pending', lat, lng, color: '#e89620', size: 0.25, altitude: 1.6 });
   globe.pointsData([...state.markers]);
-  dropMarker('pending', 0.12, 0.25);
+  dropMarker('pending', 0.12);
 
   // Reveal confirm button
   const btn = qs('#confirm-btn');
@@ -442,7 +431,7 @@ async function confirmGuess() {
       lat: actual.lat, lng: actual.lng,
       color: '#00c9a7', size: 0.28, altitude: 1.6,
     });
-    dropMarker(actualId, 0.06, 0.28, () => {
+    dropMarker(actualId, 0.06, () => {
       state.rings.push({ lat: actual.lat, lng: actual.lng });
       globe.ringsData([...state.rings]);
     });
