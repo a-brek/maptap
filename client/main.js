@@ -100,6 +100,13 @@ const UFO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="13" 
   <circle class="ufo-l5" cx="42" cy="24" r="2.5" fill="#ff0" opacity="0.9"/>
 </svg>`;
 
+// ── Nuclear Mushroom Cloud (Iran) ──────────────────────────
+const nukeEl = document.createElement('div');
+nukeEl.style.cssText = 'pointer-events:none;transform:translate(-50%,-80%);';
+nukeEl.innerHTML = `<img src="https://media.giphy.com/media/eCT0Q6KVM1772xHAE3/giphy.gif" width="30" height="30" style="display:block;" alt="">`;
+
+const nukeData = [{ lat: 32.4, lng: 53.7, el: nukeEl, alt: 0.06 }];
+
 // Blink the UFO lights via CSS in the main document
 (function injectUfoStyle() {
   const s = document.createElement('style');
@@ -113,8 +120,8 @@ const UFO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="13" 
 })();
 
 function startUfoOrbit() {
-  const INCLINATION = 12; // gentle drift, not a dramatic sine wave
-  const SPEED = 0.06;     // slow cruise
+  const INCLINATION = 12;
+  const SPEED = 0.06;
 
   const el = document.createElement('div');
   el.style.cssText = 'pointer-events:none;transform:translate(-50%,-50%);';
@@ -123,20 +130,17 @@ function startUfoOrbit() {
   const shadowEl = document.createElement('div');
   shadowEl.style.cssText = 'pointer-events:none;transform:translate(-50%,-50%);width:14px;height:5px;border-radius:50%;background:radial-gradient(ellipse,rgba(0,0,0,0.82) 0%,transparent 70%);';
 
-  // Two entries: shadow on surface, UFO above
-  const ufoData = [
-    { lat: 0, lng: 0, el: shadowEl, alt: 0.001 },
-    { lat: 0, lng: 0, el,           alt: 0.08  },
-  ];
-  let angle = 0;
+  let angle = 190; // starts over Western Europe
 
   function tick() {
-    angle += SPEED; // unbounded — no modulo so no antimeridian jump
+    angle += SPEED;
     const lat = INCLINATION * Math.sin(angle * Math.PI / 180 * 0.6);
     const lng = angle % 360 - 180;
-    ufoData[0].lat = ufoData[1].lat = lat;
-    ufoData[0].lng = ufoData[1].lng = lng;
-    globe.htmlElementsData([...ufoData]);
+    globe.htmlElementsData([
+      ...nukeData,
+      { lat, lng, el: shadowEl, alt: 0.001 },
+      { lat, lng, el,           alt: 0.08  },
+    ]);
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
@@ -211,7 +215,15 @@ function initGlobe() {
     .polygonStrokeColor(() => 'rgba(0, 201, 167, 0.75)')
     .polygonAltitude(0.007)
     // Interaction
-    .onGlobeClick(({ lat, lng }) => handleGlobeClick(lat, lng));
+    .onGlobeClick(({ lat, lng }) => handleGlobeClick(lat, lng))
+    .onZoom(({ altitude }) => {
+      const img = nukeEl.querySelector('img');
+      if (img) {
+        const size = Math.round(Math.max(8, Math.min(90, 30 * 2.2 / altitude)));
+        img.width = size;
+        img.height = size;
+      }
+    });
 
   globe.pointOfView(randomGlobeView());
 
@@ -324,49 +336,40 @@ async function confirmGuess() {
       : actual.name;
     state.roundScores.push({ score, distanceKm, emoji, locationName: actual.name, country });
 
-    // Upgrade pending → confirmed guess marker (drop altitude slightly)
+    // Upgrade pending → confirmed guess marker
     state.markers = state.markers.map(m =>
       m.id === 'pending' ? { ...m, id: `guess-${state.round}`, size: 0.2, altitude: 0.07 } : m
     );
+    globe.pointsData([...state.markers]);
 
-    // Add actual-location marker
+    // Fly globe toward actual location while UFO is en route
+    globe.pointOfView({ lat: actual.lat, lng: actual.lng, altitude: 1.8 }, 1200);
+
+    // Drop the actual-location pin, arc, label
     state.markers.push({
       id: `actual-${state.round}`,
       lat: actual.lat, lng: actual.lng,
       color: '#00c9a7', size: 0.28, altitude: 0.06,
     });
-
-    // Pulse ring at actual location
     state.rings.push({ lat: actual.lat, lng: actual.lng });
-    globe.ringsData([...state.rings]);
-
-    // Add arc
     state.arcs.push({
       startLat: lat, startLng: lng,
       endLat: actual.lat, endLng: actual.lng,
-      color: d => d === state.arcs[state.arcs.length - 1]
-        ? ['#e89620', '#00c9a7']
-        : ['#e89620', '#00c9a7'],
+      color: ['#e89620', '#00c9a7'],
     });
-    // Simpler: store colors directly
-    state.arcs[state.arcs.length - 1].color = ['#e89620', '#00c9a7'];
+    state.labels.push({ lat: actual.lat, lng: actual.lng, text: actual.name, color: '#00c9a7' });
 
-    // Add label
-    state.labels.push({
-      lat: actual.lat, lng: actual.lng,
-      text: actual.name,
-      color: '#00c9a7',
-    });
-
+    const world = state.puzzle.locations[state.round]?.world || 'earth';
     globe.pointsData([...state.markers]);
+    globe.ringsData([...state.rings]);
     globe.arcsData([...state.arcs]);
-    globe.labelsData([...OCEAN_LABELS, ...state.labels]);
+    globe.labelsData([
+      ...(WORLD_CONFIG[world]?.showOceans ? OCEAN_LABELS : []),
+      ...state.labels,
+    ]);
+    if (world === 'earth') showCountryHighlight(country);
 
-    // Fly to actual location and highlight its country
-    globe.pointOfView({ lat: actual.lat, lng: actual.lng, altitude: 1.8 }, 1400);
-    showCountryHighlight(country);
-
-    // Update score
+    // Update score display immediately
     const prevTotal = state.totalScore;
     state.totalScore += score;
     const scoreEl = qs('#score-display');
@@ -376,7 +379,7 @@ async function confirmGuess() {
 
     updatePips(state.round, 'done');
 
-    // Slide in score popup after fly-in
+    // Score popup after fly-in
     setTimeout(() => {
       hideCluePanel();
       showScorePopup(score, distanceKm, actual);
@@ -391,17 +394,20 @@ async function confirmGuess() {
 
 // ── Clue Panel ─────────────────────────────────────────────
 function showCluePanel() {
-  const loc = state.puzzle.locations[state.round];
+  const loc   = state.puzzle.locations[state.round];
+  const world = loc.world || 'earth';
+  const wcfg  = WORLD_CONFIG[world] || WORLD_CONFIG.earth;
 
   qs('#round-number').textContent  = String(state.round + 1).padStart(2, '0');
   qs('#round-label').textContent   = `Round ${state.round + 1} of 5`;
   qs('#location-clue').textContent = loc.name;
+  qs('#location-sub').textContent  = wcfg.label;
   qs('#hint-toggle').setAttribute('hidden', '');
   qs('#hint-text').classList.remove('visible');
   qs('#hint-text').setAttribute('aria-hidden', 'true');
   qs('#guess-prompt').textContent  = window.matchMedia('(hover: none)').matches
-    ? 'Tap the globe to place your guess'
-    : 'Click the globe to place your guess';
+    ? `Tap the ${wcfg.label} to place your guess`
+    : `Click the ${wcfg.label} to place your guess`;
   qs('#confirm-btn').setAttribute('hidden', '');
   qs('#confirm-btn').removeAttribute('disabled');
   qs('#confirm-btn').textContent   = 'Confirm Guess';
@@ -409,6 +415,7 @@ function showCluePanel() {
   state.hintVisible   = false;
   state.pendingGuess  = null;
 
+  setGlobeWorld(world);
   clearCountryHighlight();
 
   updateRoundDisplay();
@@ -589,6 +596,135 @@ async function copyShareText() {
 
   btn.textContent = 'Copied!';
   setTimeout(() => { btn.textContent = 'Copy Results'; }, 2000);
+}
+
+// ── World Switching ────────────────────────────────────────
+// Texture base URLs
+const _TX  = 'https://cdn.jsdelivr.net/gh/jeromeetienne/threex.planets@master/images/';
+const _SSC = 'https://www.solarsystemscope.com/textures/download/';
+
+const WORLD_CONFIG = {
+  // ── Inner Solar System ──────────────────────────────────
+  earth: {
+    label:          '🌍 Earth',
+    globeImage:     'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
+    bumpImage:      'https://unpkg.com/three-globe/example/img/earth-topology.png',
+    atmosphere:     true,
+    atmosphereColor:'rgba(100, 160, 255, 0.3)',
+    atmosphereAlt:  0.16,
+    showOceans:     true,
+  },
+  moon: {
+    label:          '🌕 Moon',
+    globeImage:     `${_TX}moonmap1k.jpg`,
+    bumpImage:      `${_TX}moonbump1k.jpg`,
+    atmosphere:     false,
+    atmosphereColor:'rgba(0,0,0,0)',
+    atmosphereAlt:  0.01,
+    showOceans:     false,
+  },
+  mars: {
+    label:          '🔴 Mars',
+    globeImage:     `${_TX}marsmap1k.jpg`,
+    bumpImage:      `${_TX}marsbump1k.jpg`,
+    atmosphere:     true,
+    atmosphereColor:'rgba(200, 120, 80, 0.25)',
+    atmosphereAlt:  0.08,
+    showOceans:     false,
+  },
+  mercury: {
+    label:          '🪨 Mercury',
+    globeImage:     `${_TX}mercurymap1k.jpg`,
+    bumpImage:      `${_TX}mercurybump1k.jpg`,
+    atmosphere:     false,
+    atmosphereColor:'rgba(0,0,0,0)',
+    atmosphereAlt:  0.01,
+    showOceans:     false,
+  },
+  venus: {
+    label:          '🌫️ Venus',
+    globeImage:     `${_TX}venusmap1k.jpg`,
+    bumpImage:      null,
+    atmosphere:     true,
+    atmosphereColor:'rgba(255, 200, 80, 0.35)',
+    atmosphereAlt:  0.22,
+    showOceans:     false,
+  },
+  // ── Jupiter System ──────────────────────────────────────
+  io: {
+    label:          '🟡 Io',
+    globeImage:     `${_SSC}2k_io.jpg`,
+    bumpImage:      null,
+    atmosphere:     false,
+    atmosphereColor:'rgba(255, 210, 60, 0.1)',
+    atmosphereAlt:  0.02,
+    showOceans:     false,
+  },
+  europa: {
+    label:          '🧊 Europa',
+    globeImage:     `${_SSC}2k_europa.jpg`,
+    bumpImage:      null,
+    atmosphere:     false,
+    atmosphereColor:'rgba(180, 220, 255, 0.08)',
+    atmosphereAlt:  0.02,
+    showOceans:     false,
+  },
+  ganymede: {
+    label:          '🌑 Ganymede',
+    globeImage:     `${_SSC}2k_ganymede.jpg`,
+    bumpImage:      null,
+    atmosphere:     false,
+    atmosphereColor:'rgba(0,0,0,0)',
+    atmosphereAlt:  0.01,
+    showOceans:     false,
+  },
+  callisto: {
+    label:          '🌑 Callisto',
+    globeImage:     `${_SSC}2k_callisto.jpg`,
+    bumpImage:      null,
+    atmosphere:     false,
+    atmosphereColor:'rgba(0,0,0,0)',
+    atmosphereAlt:  0.01,
+    showOceans:     false,
+  },
+  // ── Saturn System ───────────────────────────────────────
+  titan: {
+    label:          '🟠 Titan',
+    globeImage:     `${_SSC}2k_titan.jpg`,
+    bumpImage:      null,
+    atmosphere:     true,
+    atmosphereColor:'rgba(210, 140, 60, 0.4)',
+    atmosphereAlt:  0.18,
+    showOceans:     false,
+  },
+  // ── Other Notable Bodies ────────────────────────────────
+  pluto: {
+    label:          '🌐 Pluto',
+    globeImage:     `${_SSC}2k_eris_fictional.jpg`,
+    bumpImage:      null,
+    atmosphere:     false,
+    atmosphereColor:'rgba(0,0,0,0)',
+    atmosphereAlt:  0.01,
+    showOceans:     false,
+  },
+};
+
+let _currentWorld = 'earth';
+
+function setGlobeWorld(world) {
+  if (world === _currentWorld) return;
+  _currentWorld = world;
+  const cfg = WORLD_CONFIG[world] || WORLD_CONFIG.earth;
+
+  globe
+    .globeImageUrl(cfg.globeImage)
+    .bumpImageUrl(cfg.bumpImage || '')
+    .showAtmosphere(cfg.atmosphere)
+    .atmosphereColor(cfg.atmosphereColor)
+    .atmosphereAltitude(cfg.atmosphereAlt);
+
+  // Ocean labels only make sense on Earth
+  globe.labelsData(cfg.showOceans ? [...OCEAN_LABELS, ...state.labels] : [...state.labels]);
 }
 
 // ── Init ───────────────────────────────────────────────────
