@@ -36,7 +36,8 @@ function haversine(lat1, lng1, lat2, lng2, R = 6371) {
 // Scoring
 // ---------------------------------------------------------------------------
 function calcScore(distKm, maxDist = 2000) {
-  return Math.round(100 * Math.max(0, Math.sqrt(Math.max(0, 1 - distKm / maxDist))));
+  // Exponential decay — halflife at 37.5% of maxDist, tapers smoothly to 0
+  return Math.round(100 * Math.exp(-distKm * Math.LN2 / (maxDist * 0.375)));
 }
 
 // ---------------------------------------------------------------------------
