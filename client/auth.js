@@ -259,8 +259,6 @@ window.Auth = (() => {
       }
     });
 
-    // Play as guest
-    qs('#guest-btn').addEventListener('click', () => closeModal('#auth-modal'));
 
     // Google button visibility
     if (!googleEnabled) {
