@@ -9,7 +9,7 @@
 // ── State ──────────────────────────────────────────────────
 const state = {
   puzzle:       null,   // { date, title, locations: [{name,story,hint}] }
-  date:         null,   // "YYYY-MM-DD" or unlimited session ID
+  date:         null,   // "YYYY-MM-DD"
   round:        0,      // 0–4
   totalScore:   0,
   roundScores:  [],     // [{score, distanceKm, emoji}]
@@ -20,7 +20,6 @@ const state = {
   rings:        [],     // globe ring data
   gameOver:     false,
   hintVisible:  false,
-  mode:         'daily', // 'daily' | 'unlimited'
 };
 
 let globe = null;
@@ -29,6 +28,56 @@ const AUTO_ADVANCE_MS = 5000; // ms before auto-advancing to next round
 
 // ── Helpers ────────────────────────────────────────────────
 function qs(sel) { return document.querySelector(sel); }
+
+// ── Sound Effects ──────────────────────────────────────────
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return _audioCtx;
+}
+
+function playTone(freq, type, gainVal, duration, delay = 0) {
+  try {
+    const ctx  = getAudioCtx();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+    gain.gain.setValueAtTime(gainVal, ctx.currentTime + delay);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
+    osc.start(ctx.currentTime + delay);
+    osc.stop(ctx.currentTime + delay + duration);
+  } catch (_) {}
+}
+
+function soundConfirm() {
+  playTone(440, 'sine', 0.15, 0.12);
+}
+
+function soundReveal(score) {
+  if (score >= 90) {
+    // Pinpoint — ascending triumphant chime
+    playTone(523, 'sine', 0.18, 0.18, 0.00);
+    playTone(659, 'sine', 0.18, 0.18, 0.12);
+    playTone(784, 'sine', 0.22, 0.35, 0.24);
+  } else if (score >= 70) {
+    // Close — bright double tone
+    playTone(523, 'sine', 0.18, 0.18, 0.00);
+    playTone(659, 'sine', 0.18, 0.28, 0.14);
+  } else if (score >= 40) {
+    // Nearby — single mid tone
+    playTone(440, 'sine', 0.16, 0.25, 0.00);
+  } else if (score > 0) {
+    // Far — descending tone
+    playTone(330, 'sine', 0.14, 0.20, 0.00);
+    playTone(262, 'sine', 0.12, 0.25, 0.15);
+  } else {
+    // Miss — low thud
+    playTone(180, 'triangle', 0.18, 0.30, 0.00);
+  }
+}
 
 function scoreEmoji(score) {
   if (score >= 90) return '🟢';
@@ -375,11 +424,13 @@ async function confirmGuess() {
   const btn = qs('#confirm-btn');
   btn.setAttribute('disabled', '');
   btn.textContent = 'Submitting…';
+  soundConfirm();
 
   const { lat, lng } = state.pendingGuess;
 
   try {
     const { actual, distanceKm, score } = await revealLocation(state.date, state.round, lat, lng);
+    soundReveal(score);
 
     // Record round result — include location metadata for analytics
     const emoji   = scoreEmoji(score);
