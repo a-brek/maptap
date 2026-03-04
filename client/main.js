@@ -153,7 +153,7 @@ const UFO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="13" 
 // ── Nuclear Mushroom Cloud (Iran) ──────────────────────────
 const nukeEl = document.createElement('div');
 nukeEl.style.cssText = 'pointer-events:none;transform:translate(-50%,-80%);';
-nukeEl.innerHTML = `<img src="https://media.giphy.com/media/eCT0Q6KVM1772xHAE3/giphy.gif" width="30" height="30" style="display:block;" alt="">`;
+nukeEl.innerHTML = `<img src="https://media.giphy.com/media/eCT0Q6KVM1772xHAE3/giphy.gif" width="16" height="16" style="display:block;" alt="">`;
 
 const nukeData = [{ lat: 32.4, lng: 53.7, el: nukeEl, alt: 0.06 }];
 
