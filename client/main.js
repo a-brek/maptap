@@ -545,6 +545,11 @@ async function showAllCountryBordersAndNames() {
       .polygonCapColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.15)' : 'rgba(255,255,255,0.02)')
       .polygonSideColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.08)' : 'rgba(255,255,255,0.01)')
       .polygonStrokeColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.9)' : 'rgba(200,220,255,0.3)');
+
+    // Re-apply after polygon update to keep markers/arcs on top
+    globe.pointsData([...state.markers]);
+    globe.arcsData([...state.arcs]);
+    globe.ringsData([...state.rings]);
   } catch (err) {
     console.warn('Failed to show country borders:', err);
   }
