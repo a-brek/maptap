@@ -74,7 +74,7 @@ const _TX  = 'https://cdn.jsdelivr.net/gh/jeromeetienne/threex.planets@master/im
 const _SSC = 'https://www.solarsystemscope.com/textures/download/';
 
 const WORLD_CONFIG = {
-  earth:    { label: '🌍 Earth',    globeImage: 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg', bumpImage: 'https://unpkg.com/three-globe/example/img/earth-topology.png', atmosphere: true,  atmosphereColor: 'rgba(100, 160, 255, 0.3)', atmosphereAlt: 0.16, showOceans: true  },
+  earth:    { label: '🌍 Earth',    globeImage: '/textures/earth-8k.jpg', bumpImage: 'https://unpkg.com/three-globe/example/img/earth-topology.png', atmosphere: true,  atmosphereColor: 'rgba(100, 160, 255, 0.3)', atmosphereAlt: 0.16, showOceans: true  },
   moon:     { label: '🌕 Moon',     globeImage: `${_TX}moonmap1k.jpg`,          bumpImage: `${_TX}moonbump1k.jpg`,     atmosphere: false, atmosphereColor: 'rgba(0,0,0,0)',              atmosphereAlt: 0.01, showOceans: false },
   mars:     { label: '🔴 Mars',     globeImage: `${_TX}marsmap1k.jpg`,          bumpImage: `${_TX}marsbump1k.jpg`,     atmosphere: true,  atmosphereColor: 'rgba(200, 120, 80, 0.25)',   atmosphereAlt: 0.08, showOceans: false },
   mercury:  { label: '🪨 Mercury',  globeImage: `${_TX}mercurymap1k.jpg`,       bumpImage: `${_TX}mercurybump1k.jpg`,  atmosphere: false, atmosphereColor: 'rgba(0,0,0,0)',              atmosphereAlt: 0.01, showOceans: false },
@@ -139,8 +139,8 @@ function initGlobe() {
   globe = Globe({ animateIn: false })(container)
     .width(container.clientWidth)
     .height(container.clientHeight)
-    .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
-    .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+    .globeImageUrl('/textures/earth-8k.jpg')
+    .backgroundImageUrl('/textures/stars-milkyway-8k.jpg')
     .atmosphereColor('rgba(100, 160, 255, 0.3)')
     .atmosphereAltitude(0.16)
     .pointsData([]).pointLat('lat').pointLng('lng').pointColor('color').pointRadius('size').pointAltitude('altitude')
@@ -152,6 +152,19 @@ function initGlobe() {
     .onGlobeClick(({ lat, lng }) => handleGlobeClick(lat, lng));
 
   globe.pointOfView(randomGlobeView());
+
+  // Anisotropic filtering — keeps texture sharp when zoomed/tilted
+  {
+    const renderer = globe.renderer();
+    const maxAniso = renderer.capabilities.getMaxAnisotropy();
+    let attempts = 0;
+    (function applyAniso() {
+      const mat = globe.globeMaterial();
+      if (mat.map) { mat.map.anisotropy = maxAniso; mat.map.needsUpdate = true; }
+      else if (++attempts < 300) requestAnimationFrame(applyAniso);
+    })();
+  }
+
   window.addEventListener('resize', () => {
     globe.width(container.clientWidth).height(container.clientHeight);
   });

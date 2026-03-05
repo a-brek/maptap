@@ -785,6 +785,7 @@ body::after {
   transition: color var(--t), border-color var(--t);
 }
 .flat-btn:hover { color: var(--teal); border-color: var(--teal-dim); }
+.flat-btn.active { color: var(--amber); border-color: var(--amber-dim); }
 
 /* ── Flat Earth Underside Panel ──────────────────────────── */
 #flat-earth-underside {

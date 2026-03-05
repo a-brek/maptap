@@ -329,6 +329,64 @@ function startMissileConflict() {
   setTimeout(israelFires, 350);
 }
 
+// ── Hard Mode Toggle ────────────────────────────────────────────
+let _hardMode = false;
+function toggleHardMode() {
+  _hardMode = !_hardMode;
+  if (_hardMode) {
+    _nightMode = false;
+    qs('#night-btn')?.classList.remove('active');
+  }
+  const texture = _hardMode ? '/textures/earth-8k-specular.jpg' : '/textures/earth-16k.jpg';
+  globe.globeImageUrl(texture);
+  qs('#hard-btn')?.classList.toggle('active', _hardMode);
+}
+
+// ── Night Mode Toggle ───────────────────────────────────────────
+let _nightMode = false;
+function toggleNightMode() {
+  _nightMode = !_nightMode;
+  if (_nightMode) {
+    _hardMode = false;
+    qs('#hard-btn')?.classList.remove('active');
+  }
+  const texture = _nightMode ? '/textures/earth-8k-night.jpg' : '/textures/earth-16k.jpg';
+  globe.globeImageUrl(texture);
+  qs('#night-btn')?.classList.toggle('active', _nightMode);
+}
+
+// ── Cloud Layer ─────────────────────────────────────────────────
+let _cloudMesh = null;
+let _cloudVisible = false;
+
+function initClouds() {
+  const texture = new THREE.TextureLoader().load('/textures/earth-8k-clouds.jpg');
+  const mat = new THREE.MeshPhongMaterial({
+    map: texture,
+    transparent: true,
+    opacity: 0.4,
+    depthWrite: false,
+  });
+  // Globe radius in three-globe is 100 units; clouds sit just above
+  const geo = new THREE.SphereGeometry(101, 64, 64);
+  _cloudMesh = new THREE.Mesh(geo, mat);
+  _cloudMesh.visible = false;
+  globe.scene().add(_cloudMesh);
+
+  // Slowly rotate clouds
+  (function rotateClouds() {
+    if (_cloudMesh) _cloudMesh.rotation.y += 0.00008;
+    requestAnimationFrame(rotateClouds);
+  })();
+}
+
+function toggleClouds() {
+  if (!_cloudMesh) return;
+  _cloudVisible = !_cloudVisible;
+  _cloudMesh.visible = _cloudVisible;
+  qs('#cloud-btn')?.classList.toggle('active', _cloudVisible);
+}
+
 // ── Flat Earth Toggle ───────────────────────────────────────────
 let _flatEarth  = false;
 let _preFlatPov = null;
@@ -375,8 +433,8 @@ function initGlobe() {
   globe = Globe({ animateIn: false })(container)
     .width(container.clientWidth)
     .height(container.clientHeight)
-    .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
-    .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+    .globeImageUrl('/textures/earth-16k.jpg')
+    .backgroundImageUrl('/textures/stars-milkyway-8k.jpg')
     .atmosphereColor('rgba(100, 160, 255, 0.3)')
     .atmosphereAltitude(0.16)
     // Markers
@@ -433,9 +491,73 @@ function initGlobe() {
 
   globe.pointOfView(randomGlobeView());
 
+  // Anisotropic filtering — keeps texture sharp when zoomed/tilted
+  {
+    const renderer = globe.renderer();
+    const maxAniso = renderer.capabilities.getMaxAnisotropy();
+    let attempts = 0;
+    (function applyAniso() {
+      const mat = globe.globeMaterial();
+      if (mat.map) { mat.map.anisotropy = maxAniso; mat.map.needsUpdate = true; }
+      else if (++attempts < 300) requestAnimationFrame(applyAniso);
+    })();
+  }
+
   window.addEventListener('resize', () => {
     globe.width(container.clientWidth).height(container.clientHeight);
   });
+
+  initMoon();
+}
+
+// ── Moon ────────────────────────────────────────────────────
+function initMoon() {
+  if (typeof THREE === 'undefined') return;
+
+  // Globe radius in THREE units = 100; moon orbits at 3x that distance
+  const ORBIT_R  = 300;
+  const MOON_R   = 13;
+  const TILT     = 0.089; // ~5° orbital inclination in radians
+  const SPEED    = 0.008; // radians per second
+
+  const tex = new THREE.TextureLoader().load('/textures/moon-8k.jpg');
+  const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, opacity: 0 });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(MOON_R, 48, 48), mat);
+  // Moon rotates on its own axis (tidally locked approximation)
+  mesh.rotation.y = Math.PI;
+  globe.scene().add(mesh);
+
+  // Ensure the scene has a light that reaches the moon
+  const moonLight = new THREE.DirectionalLight(0xffffff, 0.6);
+  moonLight.position.set(500, 200, 300);
+  globe.scene().add(moonLight);
+
+  let angle = Math.PI / 4; // start offset so moon isn't behind Earth on load
+  let lastTime = performance.now();
+
+  (function tick(now) {
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+    angle += SPEED * dt;
+
+    // Orbit position with slight inclination
+    mesh.position.set(
+      ORBIT_R * Math.cos(angle),
+      ORBIT_R * Math.sin(TILT) * Math.sin(angle),
+      ORBIT_R * Math.sin(angle) * Math.cos(TILT)
+    );
+
+    // Tidally locked — face toward Earth (origin)
+    mesh.lookAt(0, 0, 0);
+    mesh.rotateY(Math.PI); // flip so lit side faces the light
+
+    // Fade in/out based on zoom level
+    const alt = globe.pointOfView()?.altitude ?? 2;
+    const t = Math.max(0, Math.min(1, (alt - 1.5) / 1.0)); // 0 at alt≤1.5, 1 at alt≥2.5
+    mat.opacity = t;
+
+    requestAnimationFrame(tick);
+  })(lastTime);
 }
 
 // ── Country Highlight ──────────────────────────────────────
@@ -973,7 +1095,7 @@ const WORLD_CONFIG = {
   // ── Inner Solar System ──────────────────────────────────
   earth: {
     label:          '🌍 Earth',
-    globeImage:     'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
+    globeImage:     '/textures/earth-16k.jpg',
     bumpImage:      'https://unpkg.com/three-globe/example/img/earth-topology.png',
     atmosphere:     true,
     atmosphereColor:'rgba(100, 160, 255, 0.3)',
@@ -1112,7 +1234,11 @@ async function init() {
     qs('#results-fab').setAttribute('hidden', '');
     qs('#game-over').removeAttribute('hidden');
   });
+  qs('#hard-btn')?.addEventListener('click', toggleHardMode);
+  qs('#cloud-btn')?.addEventListener('click', toggleClouds);
+  qs('#night-btn')?.addEventListener('click', toggleNightMode);
   qs('#flat-btn')?.addEventListener('click', toggleFlatEarth);
+  initClouds();
   qs('#game-title').addEventListener('dblclick', toggleFlatEarth);
 
   // Auth init and puzzle fetch run in parallel
