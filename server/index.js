@@ -154,6 +154,12 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  // Add game_data column if not present (safe to re-run)
+  try {
+    await db.query(`ALTER TABLE daily_scores ADD COLUMN IF NOT EXISTS game_data JSONB`);
+  } catch (err) {
+    console.warn('Migration warning:', err.message);
+  }
   console.log(`\n  🌍  Tap Map running at http://localhost:${PORT}\n`);
 });

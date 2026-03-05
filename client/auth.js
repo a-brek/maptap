@@ -105,16 +105,27 @@ window.Auth = (() => {
   // ── Score Saving ───────────────────────────────────────────
 
   // Returns the player's daily rank (integer) or null
-  async function saveScore(date, totalScore, roundScores) {
+  async function saveScore(date, totalScore, roundScores, actuals, guesses) {
     if (!currentUser) return null;
     try {
       const data = await apiFetch('/api/user/score', {
         method: 'POST',
-        body: JSON.stringify({ date, totalScore, roundScores }),
+        body: JSON.stringify({ date, totalScore, roundScores, actuals, guesses }),
       });
       return data.rank ?? null;
     } catch (err) {
       console.error('Score save failed:', err);
+      return null;
+    }
+  }
+
+  // Returns today's server result or null if not played / not logged in
+  async function getTodayResult(date) {
+    if (!currentUser) return null;
+    try {
+      const data = await apiFetch(`/api/user/today/${date}`);
+      return data.played ? data : null;
+    } catch (err) {
       return null;
     }
   }
@@ -382,5 +393,5 @@ window.Auth = (() => {
     }
   }
 
-  return { init, onGameReady, saveScore, getUser: () => currentUser };
+  return { init, onGameReady, saveScore, getTodayResult, getUser: () => currentUser };
 })();

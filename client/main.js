@@ -892,7 +892,7 @@ function showGameOver(skipSave = false) {
 
   // Save score + show rank (async — updates UI when server responds)
   if (!skipSave) {
-    Auth.saveScore(state.date, state.totalScore, state.roundScores).then(rank => {
+    Auth.saveScore(state.date, state.totalScore, state.roundScores, state.actuals, state.guesses).then(rank => {
       if (rank !== null) showRank(rank);
     });
   }
@@ -1122,8 +1122,22 @@ async function init() {
 
     pruneOldResults(puzzle.date);
 
-    // Check if this puzzle was already completed today
-    const saved = loadResultLocally(puzzle.date, state.puzzleVersion);
+    // Check if this puzzle was already completed today (local first, then server)
+    let saved = loadResultLocally(puzzle.date, state.puzzleVersion);
+    if (!saved && authUser) {
+      const serverResult = await Auth.getTodayResult(puzzle.date);
+      if (serverResult) {
+        saved = {
+          version:     state.puzzleVersion,
+          totalScore:  serverResult.totalScore,
+          roundScores: serverResult.roundScores,
+          guesses:     serverResult.gameData?.guesses  ?? [],
+          actuals:     serverResult.gameData?.actuals  ?? [],
+        };
+        // Persist locally so future loads skip the server round-trip
+        try { localStorage.setItem(`tapmap-result-${puzzle.date}`, JSON.stringify(saved)); } catch (_) {}
+      }
+    }
     if (saved) {
       state.totalScore  = saved.totalScore;
       state.roundScores = saved.roundScores;
