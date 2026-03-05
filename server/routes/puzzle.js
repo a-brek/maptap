@@ -52,6 +52,13 @@ function seededRng(seed) {
 }
 
 // ---------------------------------------------------------------------------
+// Puzzle version — bump to let clients replay even if they already finished
+// ---------------------------------------------------------------------------
+const PUZZLE_VERSIONS = {
+  '2026-03-04': 2,
+};
+
+// ---------------------------------------------------------------------------
 // Manual overrides — hardcoded puzzles for specific dates
 // ---------------------------------------------------------------------------
 const DATE_OVERRIDES = {
@@ -108,6 +115,7 @@ router.get('/today', (req, res) => {
   const locs  = getLocationsForDate(today);
   res.json({
     date:      today,
+    version:   PUZZLE_VERSIONS[today] || 1,
     locations: locs.map(({ name, world }) => ({ name, world: world || 'earth' })),
   });
 });
@@ -123,6 +131,7 @@ router.get('/:date', (req, res) => {
   const locs = getLocationsForDate(date);
   res.json({
     date,
+    version:   PUZZLE_VERSIONS[date] || 1,
     locations: locs.map(({ name, world }) => ({ name, world: world || 'earth' })),
   });
 });

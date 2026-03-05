@@ -400,7 +400,7 @@ function initGlobe() {
     .arcEndLat('endLat')
     .arcEndLng('endLng')
     .arcColor('color')
-    .arcAltitude(d => d.altitude ?? 0.28)
+    .arcAltitude(d => d.altitude ?? 0.12)
     .arcDashLength(d => d.dashLength ?? 0.45)
     .arcDashGap(d => d.dashGap ?? 0.12)
     .arcDashAnimateTime(d => d.dashTime ?? 2400)
@@ -577,14 +577,14 @@ async function confirmGuess() {
       startLat: lat, startLng: lng,
       endLat: actual.lat, endLng: actual.lng,
       color: ['rgba(232,150,32,0.22)', 'rgba(0,201,167,0.22)'],
-      stroke: 1.9, altitude: 0.3, dashLength: 1, dashGap: 0, dashTime: 0,
+      stroke: 1.9, altitude: 0.12, dashLength: 1, dashGap: 0, dashTime: 0,
     });
     // Bright animated traveler dot
     state.arcs.push({
       startLat: lat, startLng: lng,
       endLat: actual.lat, endLng: actual.lng,
       color: ['#e89620', '#00c9a7'],
-      stroke: 0.38, altitude: 0.3, dashLength: 0.07, dashGap: 0.93, dashTime: 1600,
+      stroke: 0.38, altitude: 0.12, dashLength: 0.07, dashGap: 0.93, dashTime: 1600,
     });
     state.labels.push({ lat: actual.lat, lng: actual.lng, text: actual.name, color: '#00c9a7' });
 
@@ -763,6 +763,7 @@ function pruneOldResults(todayStr) {
 function saveResultLocally() {
   try {
     localStorage.setItem(`tapmap-result-${state.date}`, JSON.stringify({
+      version:     state.puzzleVersion,
       totalScore:  state.totalScore,
       roundScores: state.roundScores,
       guesses:     state.guesses,
@@ -771,10 +772,16 @@ function saveResultLocally() {
   } catch (_) {}
 }
 
-function loadResultLocally(date) {
+function loadResultLocally(date, version) {
   try {
     const raw = localStorage.getItem(`tapmap-result-${date}`);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (saved.version !== version) {
+      localStorage.removeItem(`tapmap-result-${date}`);
+      return null;
+    }
+    return saved;
   } catch (_) { return null; }
 }
 
@@ -1046,13 +1053,14 @@ async function init() {
       fetchPuzzle(),
     ]);
 
-    state.puzzle = puzzle;
-    state.date   = puzzle.date;
+    state.puzzle        = puzzle;
+    state.date          = puzzle.date;
+    state.puzzleVersion = puzzle.version || 1;
 
     pruneOldResults(puzzle.date);
 
     // Check if this puzzle was already completed today
-    const saved = loadResultLocally(puzzle.date);
+    const saved = loadResultLocally(puzzle.date, state.puzzleVersion);
     if (saved) {
       state.totalScore  = saved.totalScore;
       state.roundScores = saved.roundScores;
@@ -1067,8 +1075,8 @@ async function init() {
         if (a) {
           state.markers.push({ id: `actual-${i}`, lat: a.lat, lng: a.lng, color: '#00c9a7', size: 0.28, altitude: 0.06 });
           state.arcs.push(
-            { startLat: g.lat, startLng: g.lng, endLat: a.lat, endLng: a.lng, color: ['rgba(232,150,32,0.22)', 'rgba(0,201,167,0.22)'], stroke: 1.9, altitude: 0.3, dashLength: 1, dashGap: 0, dashTime: 0 },
-            { startLat: g.lat, startLng: g.lng, endLat: a.lat, endLng: a.lng, color: ['#e89620', '#00c9a7'], stroke: 0.38, altitude: 0.3, dashLength: 0.07, dashGap: 0.93, dashTime: 1600 },
+            { startLat: g.lat, startLng: g.lng, endLat: a.lat, endLng: a.lng, color: ['rgba(232,150,32,0.22)', 'rgba(0,201,167,0.22)'], stroke: 1.9, altitude: 0.12, dashLength: 1, dashGap: 0, dashTime: 0 },
+            { startLat: g.lat, startLng: g.lng, endLat: a.lat, endLng: a.lng, color: ['#e89620', '#00c9a7'], stroke: 0.38, altitude: 0.12, dashLength: 0.07, dashGap: 0.93, dashTime: 1600 },
           );
           state.labels.push({ lat: a.lat, lng: a.lng, text: a.name, color: '#00c9a7' });
           state.rings.push({ lat: a.lat, lng: a.lng });
