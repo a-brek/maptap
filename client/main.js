@@ -732,6 +732,21 @@ function nextRound() {
 }
 
 // ── localStorage persistence ───────────────────────────────
+const LS_VERSION = '2';
+(function clearIfStale() {
+  try {
+    if (localStorage.getItem('tapmap-version') !== LS_VERSION) {
+      const toDelete = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k?.startsWith('tapmap-')) toDelete.push(k);
+      }
+      toDelete.forEach(k => localStorage.removeItem(k));
+      localStorage.setItem('tapmap-version', LS_VERSION);
+    }
+  } catch (_) {}
+})();
+
 function pruneOldResults(todayStr) {
   try {
     const toDelete = [];
