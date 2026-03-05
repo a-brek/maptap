@@ -578,7 +578,18 @@ const COUNTRY_ALIASES = {
   'tibet':            'china',
 };
 
+// Countries rendered as state/province splits (mapped to ISO-A2)
+const SPLIT_COUNTRY_ISO = {
+  'united states of america': 'US',
+  'united states':            'US',
+  'usa':                      'US',
+  'canada':                   'CA',
+  'australia':                'AU',
+};
+const SPLIT_ISO_SET = new Set(['US', 'CA', 'AU']);
+
 let _worldGeoCache = null;
+let _admin1GeoCache = null;
 
 async function loadWorldGeo() {
   if (_worldGeoCache) return _worldGeoCache;
@@ -587,6 +598,21 @@ async function loadWorldGeo() {
   );
   _worldGeoCache = await res.json();
   return _worldGeoCache;
+}
+
+async function loadAdmin1Geo() {
+  if (_admin1GeoCache) return _admin1GeoCache;
+  const res = await fetch(
+    'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_1_states_provinces.geojson'
+  );
+  _admin1GeoCache = await res.json();
+  return _admin1GeoCache;
+}
+
+function getSubdivisions(admin1Geo, isoA2) {
+  return admin1Geo.features.filter(f =>
+    f.properties.adm0_a2 === isoA2 || f.properties.iso_a2 === isoA2
+  );
 }
 
 function findCountry(geo, rawName) {
@@ -599,6 +625,13 @@ function findCountry(geo, rawName) {
 
 async function showCountryHighlight(countryName) {
   try {
+    const isoA2 = SPLIT_COUNTRY_ISO[countryName.toLowerCase()];
+    if (isoA2) {
+      const admin1 = await loadAdmin1Geo();
+      const subdivs = getSubdivisions(admin1, isoA2);
+      if (subdivs.length) globe.polygonsData(subdivs);
+      return;
+    }
     const geo     = await loadWorldGeo();
     const feature = findCountry(geo, countryName);
     if (feature) globe.polygonsData([feature]);
@@ -635,7 +668,7 @@ function _featureCentroid(feature) {
 
 async function showAllCountryBordersAndNames() {
   try {
-    const geo = await loadWorldGeo();
+    const [geo, admin1] = await Promise.all([loadWorldGeo(), loadAdmin1Geo()]);
 
     // Build set of highlighted countries from all correct answers
     const highlightSet = new Set();
@@ -646,7 +679,28 @@ async function showAllCountryBordersAndNames() {
       highlightSet.add(c);
     });
 
+    // ISO codes for highlighted split countries
+    const highlightedSplitISO = new Set();
+    for (const h of highlightSet) {
+      const iso = SPLIT_COUNTRY_ISO[h];
+      if (iso) highlightedSplitISO.add(iso);
+    }
+
+    // Build feature list: swap split countries for their subdivisions
+    const worldFeatures = geo.features.filter(f => {
+      const name = (f.properties.name || '').toLowerCase();
+      return !SPLIT_COUNTRY_ISO[name];
+    });
+    const subdivFeatures = admin1.features.filter(f =>
+      SPLIT_ISO_SET.has(f.properties.adm0_a2) || SPLIT_ISO_SET.has(f.properties.iso_a2)
+    );
+    const allFeatures = [...worldFeatures, ...subdivFeatures];
+
     function isHighlighted(f) {
+      // Subdivision: highlight if parent country is highlighted
+      const adm0 = f.properties.adm0_a2 || f.properties.iso_a2;
+      if (adm0 && highlightedSplitISO.has(adm0)) return true;
+      // Country feature: check name match
       const name = (f.properties.name || '').toLowerCase();
       for (const h of highlightSet) {
         if (name === h || name.includes(h) || h.includes(name)) return true;
@@ -654,17 +708,18 @@ async function showAllCountryBordersAndNames() {
       return false;
     }
 
-    // Country name labels from centroids
-    const countryLabels = geo.features.map(f => {
+    // Labels: country names for world features, state names for subdivisions
+    const countryLabels = allFeatures.map(f => {
       const c = _featureCentroid(f);
       if (!c) return null;
-      return { lat: c[1], lng: c[0], text: f.properties.name, color: 'rgba(200,220,255,0.5)', isCountryName: true };
+      const text = f.properties.name || f.properties.NAME || '';
+      return { lat: c[1], lng: c[0], text, color: 'rgba(200,220,255,0.5)', isCountryName: true };
     }).filter(Boolean);
 
     globe.labelsData([ZAC_LABEL, ...state.labels, ...countryLabels]);
 
     globe
-      .polygonsData(geo.features)
+      .polygonsData(allFeatures)
       .polygonCapColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.15)' : 'rgba(255,255,255,0.02)')
       .polygonSideColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.08)' : 'rgba(255,255,255,0.01)')
       .polygonStrokeColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.9)' : 'rgba(200,220,255,0.3)');
