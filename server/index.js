@@ -145,6 +145,7 @@ app.use('/api/analytics',   analyticsRoutes);
 
 // ── Serve Client ──────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '../client')));
+app.get('/practice', (_req, res) => res.sendFile(path.join(__dirname, '../client/practice.html')));
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, '../client/index.html')));
 
 // ── Global Error Handler ──────────────────────────────────

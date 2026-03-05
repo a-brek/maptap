@@ -37,6 +37,12 @@
         <div id="score-display">0</div>
       </div>
 
+      <!-- Practice mode link -->
+      <a href="/practice" class="hud-practice-btn" title="Practice Mode (unlimited, unranked)">Practice</a>
+
+      <!-- Flat Earth toggle -->
+      <button id="flat-btn" class="flat-btn" title="Flat Earth Mode">⊕</button>
+
       <!-- Leaderboard shortcut -->
       <button class="leaderboard-trigger hud-lb-btn" title="Leaderboard">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
@@ -54,6 +60,7 @@
         </button>
         <div id="user-dropdown" hidden>
           <button id="history-btn" class="dropdown-item">History</button>
+          <a href="/practice" class="dropdown-item" style="text-decoration:none;display:block;">Practice Mode</a>
           <button id="logout-btn" class="dropdown-item">Sign Out</button>
         </div>
       </div>
@@ -120,6 +127,36 @@
   </div>
   <!-- Floating pill shown when card is hidden on mobile -->
   <button id="results-fab" hidden>Results ↑</button>
+
+  <!-- ── Flat Earth Underside ─────────────────────────────── -->
+  <div id="flat-earth-underside" hidden aria-hidden="true">
+    <div class="fe-content">
+      <div class="fe-title">WHAT LIES BENEATH</div>
+      <div class="fe-pillars">
+        <div class="fe-pillar">
+          <div class="fe-icon">🐘</div>
+          <div class="fe-pillar-label">Four Elephants</div>
+          <div class="fe-pillar-desc">Ancient Hindu cosmology places four mighty elephants at the disc's corners, bearing the weight of all creation.</div>
+        </div>
+        <div class="fe-pillar">
+          <div class="fe-icon">🐢</div>
+          <div class="fe-pillar-label">World Turtle</div>
+          <div class="fe-pillar-desc">The elephants stand upon Great A'Tuin — a colossal star turtle swimming endlessly through the cosmos.</div>
+        </div>
+        <div class="fe-pillar">
+          <div class="fe-icon">🧱</div>
+          <div class="fe-pillar-label">The Ice Wall</div>
+          <div class="fe-pillar-desc">Antarctica is not a continent — it's a 150-foot ice wall encircling the disc, guarded by governments worldwide.</div>
+        </div>
+        <div class="fe-pillar">
+          <div class="fe-icon">🔔</div>
+          <div class="fe-pillar-label">The Firmament</div>
+          <div class="fe-pillar-desc">A solid glass dome 100km overhead contains our atmosphere. The sun and moon are small local lights circling inside it.</div>
+        </div>
+      </div>
+      <div class="fe-conspiracy">⚠ NASA IS A FILM STUDIO &nbsp;·&nbsp; GRAVITY IS ACCELERATION &nbsp;·&nbsp; THE UN FLAG SHOWS THE TRUTH &nbsp;·&nbsp; #WAKEUP</div>
+    </div>
+  </div>
 
   <!-- ── Loading Screen ───────────────────────────────────── -->
   <div id="loading" aria-label="Loading">

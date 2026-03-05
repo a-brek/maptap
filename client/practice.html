@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Tap Map — Practice</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=IBM+Plex+Sans+Condensed:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* ── Practice-specific overrides ── */
+    #game-title .practice-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      color: var(--teal);
+      display: block;
+      margin-top: -4px;
+      text-transform: uppercase;
+    }
+    .back-link {
+      font-family: var(--font-mono);
+      font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--text-dim);
+      text-decoration: none;
+      border: 1px solid var(--border-hi);
+      padding: 5px 8px;
+      display: inline-flex; align-items: center; gap: 5px;
+      transition: color var(--t), border-color var(--t);
+    }
+    .back-link:hover { color: var(--amber); border-color: var(--amber-dim); }
+
+    .play-again-btn {
+      font-family: var(--font-mono);
+      font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+      background: none;
+      border: 1px solid var(--teal-dim);
+      color: var(--teal);
+      padding: 9px 18px;
+      width: 100%;
+      margin-top: 4px;
+      transition: background var(--t), color var(--t);
+    }
+    .play-again-btn:hover { background: var(--teal-glow); }
+
+    .practice-note {
+      font-family: var(--font-mono);
+      font-size: 9px; letter-spacing: 0.12em;
+      color: var(--text-dim);
+      text-align: center;
+      margin-top: 8px;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── 3D Globe ─────────────────────────────────────────── -->
+  <div id="globe-container"></div>
+
+  <!-- ── HUD Header ───────────────────────────────────────── -->
+  <header id="hud">
+    <div id="game-title">
+      TAP<span> MAP</span>
+      <span class="practice-label">Practice</span>
+    </div>
+
+    <div class="hud-center">
+      <div class="hud-label">Round</div>
+      <div id="round-display">1 / 5</div>
+      <div id="round-pips">
+        <div class="pip" data-pip="0"></div>
+        <div class="pip" data-pip="1"></div>
+        <div class="pip" data-pip="2"></div>
+        <div class="pip" data-pip="3"></div>
+        <div class="pip" data-pip="4"></div>
+      </div>
+    </div>
+
+    <div class="hud-right">
+      <div class="hud-score-col">
+        <div class="hud-label">Score</div>
+        <div id="score-display">0</div>
+      </div>
+      <a href="/" class="back-link" title="Back to daily puzzle">← Daily</a>
+    </div>
+  </header>
+
+  <!-- ── Clue Panel ─────────────────────────────────────────── -->
+  <aside id="clue-panel" aria-live="polite">
+    <div class="panel-header">
+      <div id="round-number">01</div>
+      <div id="round-label">Round 1 of 5</div>
+    </div>
+    <div class="panel-divider"></div>
+    <p id="location-clue"></p>
+    <p id="location-sub">Where in the world?</p>
+
+    <button id="hint-toggle" type="button" aria-expanded="false" hidden>Show Hint</button>
+    <p id="hint-text" aria-hidden="true"></p>
+
+    <p id="guess-prompt">Click the globe to place your guess</p>
+    <button id="confirm-btn" type="button" class="btn-primary" hidden>Confirm Guess</button>
+  </aside>
+
+  <!-- ── Score Popup ────────────────────────────────────────── -->
+  <div id="score-popup" aria-live="assertive">
+    <div class="popup-score-row">
+      <div id="popup-score">+0</div>
+      <div id="popup-quality" class="quality"></div>
+    </div>
+    <div id="popup-distance"></div>
+    <div id="popup-location"></div>
+    <div class="popup-divider"></div>
+    <button id="next-btn" type="button" class="btn-outline">Next Location →</button>
+    <div id="popup-timer-bar"></div>
+  </div>
+
+  <!-- ── Game Over ─────────────────────────────────────────── -->
+  <div id="game-over" hidden>
+    <div class="game-over-card">
+      <div class="game-over-header">
+        <div class="game-over-title">Practice Results</div>
+        <button id="view-map-btn" class="view-map-btn" title="View map">↙ Map</button>
+      </div>
+      <div class="game-over-score-row">
+        <div id="final-score">0</div>
+        <div id="score-grade"></div>
+      </div>
+      <div id="score-breakdown"></div>
+      <div class="game-over-actions">
+        <button id="play-again-btn" type="button" class="play-again-btn">Play Again →</button>
+        <a href="/" class="btn-outline" style="text-align:center;text-decoration:none;display:block;">Back to Daily</a>
+      </div>
+      <p class="practice-note">Practice scores don't count toward rankings</p>
+    </div>
+  </div>
+  <!-- Floating pill shown when card is hidden on mobile -->
+  <button id="results-fab" hidden>Results ↑</button>
+
+  <!-- ── Loading Screen ───────────────────────────────────── -->
+  <div id="loading" aria-label="Loading">
+    <div class="loading-title">TAP MAP</div>
+    <div class="spinner" aria-hidden="true"></div>
+    <div class="loading-text" id="loading-text">Loading practice puzzle…</div>
+  </div>
+
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/globe.gl"></script>
+  <script src="practice.js"></script>
+</body>
+</html>

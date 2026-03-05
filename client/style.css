@@ -748,6 +748,20 @@ body::after {
 .history-score  { color: var(--amber); font-weight: 600; min-width: 4ch; text-align: right; }
 .history-grade  { color: var(--teal); min-width: 100px; text-align: right; font-size: 10px; }
 
+/* ── HUD Practice Button ─────────────────────────────────── */
+.hud-practice-btn {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-dim);
+  background: none;
+  border: 1px solid var(--border-hi);
+  padding: 5px 8px;
+  text-decoration: none;
+  display: inline-flex; align-items: center;
+  transition: color var(--t), border-color var(--t);
+}
+.hud-practice-btn:hover { color: var(--teal); border-color: var(--teal-dim); }
+
 /* ── HUD Leaderboard Button ──────────────────────────────── */
 .hud-lb-btn {
   background: none;
@@ -758,6 +772,125 @@ body::after {
   transition: color var(--t), border-color var(--t);
 }
 .hud-lb-btn:hover { color: var(--amber); border-color: var(--amber-dim); }
+
+/* ── Flat Earth Button ───────────────────────────────────── */
+.flat-btn {
+  background: none;
+  border: 1px solid var(--border-hi);
+  color: var(--text-dim);
+  padding: 4px 7px;
+  font-size: 13px;
+  line-height: 1;
+  display: flex; align-items: center;
+  transition: color var(--t), border-color var(--t);
+}
+.flat-btn:hover { color: var(--teal); border-color: var(--teal-dim); }
+
+/* ── Flat Earth Underside Panel ──────────────────────────── */
+#flat-earth-underside {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 42%;
+  z-index: 50;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(4, 8, 18, 0.7) 8%,
+    rgba(4, 8, 18, 0.92) 20%,
+    #030608 60%
+  );
+  pointer-events: none;
+  overflow: hidden;
+  animation: fe-rise 0.9s var(--ease-out-expo) both;
+}
+#flat-earth-underside[hidden] { display: none; }
+
+@keyframes fe-rise {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.fe-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 20px 14px;
+  height: 100%;
+  gap: 10px;
+}
+
+.fe-title {
+  font-family: var(--font-disp);
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  color: rgba(232, 150, 32, 0.45);
+  text-align: center;
+}
+
+.fe-pillars {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  width: 100%;
+  max-width: 780px;
+  align-items: flex-start;
+}
+
+.fe-pillar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+}
+
+.fe-icon {
+  font-size: 22px;
+  line-height: 1;
+  filter: grayscale(0.3);
+}
+
+.fe-pillar-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--amber-dim);
+  text-transform: uppercase;
+}
+
+.fe-pillar-desc {
+  font-family: var(--font-body);
+  font-size: 9px;
+  color: rgba(140, 170, 205, 0.45);
+  line-height: 1.4;
+}
+
+.fe-conspiracy {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  color: rgba(232, 150, 32, 0.28);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  animation: fe-scroll 24s linear infinite;
+}
+
+@keyframes fe-scroll {
+  0%   { letter-spacing: 0.12em; opacity: 0.4; }
+  50%  { letter-spacing: 0.18em; opacity: 0.6; }
+  100% { letter-spacing: 0.12em; opacity: 0.4; }
+}
+
+/* Mobile: tighten */
+@media (max-width: 560px) {
+  #flat-earth-underside { height: 38%; }
+  .fe-icon { font-size: 18px; }
+  .fe-pillar-desc { display: none; }
+  .fe-conspiracy { font-size: 7px; }
+}
 
 /* ── Player Rank (game-over card) ────────────────────────── */
 .player-rank {
@@ -843,6 +976,7 @@ body::after {
   #round-pips { gap: 5px; margin-top: 2px; }
   .pip { width: 7px; height: 7px; }
   .hud-lb-btn { padding: 4px 6px; }
+  .hud-practice-btn { display: none; }
   .auth-hud-btn, .user-hud-btn { font-size: 9px; padding: 4px 8px; }
 
   /* ── Clue Panel — compact floating card ── */

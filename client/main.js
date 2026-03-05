@@ -117,14 +117,6 @@ function animateCounter(el, from, to, duration = 700) {
   requestAnimationFrame(tick);
 }
 
-// ── Ocean Labels (trash talk) ───────────────────────────────
-const OCEAN_LABELS = [
-  { ocean: true, lat:  5,  lng: -30,  text: 'ATLANTIC OCEAN\nskill issue tbh',        color: 'rgba(100,180,255,0.28)' },
-  { ocean: true, lat: -5,  lng: -145, text: 'PACIFIC OCEAN\nyou would drown here',    color: 'rgba(100,180,255,0.28)' },
-  { ocean: true, lat: -20, lng:  75,  text: 'INDIAN OCEAN\nnot even on the map lol',  color: 'rgba(100,180,255,0.28)' },
-  { ocean: true, lat: -60, lng:   0,  text: 'SOUTHERN OCEAN\nyour score lives here',  color: 'rgba(100,180,255,0.28)' },
-  { ocean: true, lat:  80, lng:   0,  text: 'ARCTIC OCEAN\ncold like ur geography',   color: 'rgba(100,180,255,0.28)' },
-];
 
 // ── UFO ────────────────────────────────────────────────────
 const UFO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="13" viewBox="0 0 52 36" style="filter:drop-shadow(0 0 4px #7df)">
@@ -166,8 +158,8 @@ const UFO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="13" 
 })();
 
 function startUfoOrbit() {
-  const INCLINATION = 12;
-  const SPEED = 0.06;
+  const INCLINATION = 8 + Math.random() * 20;      // random tilt 8°–28°
+  const SPEED       = 0.04 + Math.random() * 0.05; // random speed each load
 
   const el = document.createElement('div');
   el.style.cssText = 'pointer-events:none;transform:translate(-50%,-50%);';
@@ -176,20 +168,22 @@ function startUfoOrbit() {
   const shadowEl = document.createElement('div');
   shadowEl.style.cssText = 'pointer-events:none;transform:translate(-50%,-50%);width:14px;height:5px;border-radius:50%;background:radial-gradient(ellipse,rgba(0,0,0,0.82) 0%,transparent 70%);';
 
-  let angle = 190; // starts over Western Europe
+  let angle = Math.random() * 360; // random starting position each load
 
   function tick() {
     angle += SPEED;
     const lat = INCLINATION * Math.sin(angle * Math.PI / 180 * 0.6);
     const lng = angle % 360 - 180;
-    globe.htmlElementsData([
+    const htmlItems = [
       { lat, lng, el: shadowEl, alt: 0.001 },
       { lat, lng, el,           alt: 0.08  },
-    ]);
+    ];
+    globe.htmlElementsData(htmlItems);
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
 }
+
 
 
 // ── Iran–Israel Missile Conflict ──────────────────────────
@@ -334,6 +328,37 @@ function startMissileConflict() {
   setTimeout(israelFires, 350);
 }
 
+// ── Flat Earth Toggle ───────────────────────────────────────────
+let _flatEarth  = false;
+let _preFlatPov = null;
+
+function toggleFlatEarth() {
+  _flatEarth = !_flatEarth;
+  const scene   = globe.scene();
+  const startY  = scene.scale.y;
+  const targetY = _flatEarth ? 0.016 : 1.0;
+  const underside = qs('#flat-earth-underside');
+
+  if (_flatEarth) {
+    _preFlatPov = globe.pointOfView();
+    globe.pointOfView({ lat: 89.9, lng: 0, altitude: 2.4 }, 1500);
+    if (underside) underside.removeAttribute('hidden');
+  } else {
+    if (_preFlatPov) globe.pointOfView(_preFlatPov, 1500);
+    if (underside) underside.setAttribute('hidden', '');
+  }
+
+  const t0 = performance.now();
+  (function tick(now) {
+    const t = Math.min((now - t0) / 1500, 1);
+    const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    scene.scale.y = startY + (targetY - startY) * e;
+    if (t < 1) requestAnimationFrame(tick);
+  })(t0);
+
+  const btn = qs('#flat-btn');
+  if (btn) btn.title = _flatEarth ? 'Restore Earth' : 'Flat Earth Mode';
+}
 // ── Globe Setup ────────────────────────────────────────────
 function randomGlobeView(altitude = 2.2) {
   return {
@@ -375,12 +400,12 @@ function initGlobe() {
     .arcEndLat('endLat')
     .arcEndLng('endLng')
     .arcColor('color')
-    .arcDashLength(0.45)
-    .arcDashGap(0.12)
-    .arcDashAnimateTime(2400)
-    .arcStroke(0.45)
-    // Labels (ocean labels + game labels merged; ocean labels have no dot)
-    .labelsData([...OCEAN_LABELS])
+    .arcAltitude(d => d.altitude ?? 0.28)
+    .arcDashLength(d => d.dashLength ?? 0.45)
+    .arcDashGap(d => d.dashGap ?? 0.12)
+    .arcDashAnimateTime(d => d.dashTime ?? 2400)
+    .arcStroke(d => d.stroke ?? 0.4)
+    .labelsData([])
     .labelLat('lat')
     .labelLng('lng')
     .labelText('text')
@@ -539,10 +564,19 @@ async function confirmGuess() {
     state.guesses.push({ lat, lng });
     state.actuals.push({ lat: actual.lat, lng: actual.lng, name: actual.name });
     state.rings.push({ lat: actual.lat, lng: actual.lng });
+    // Outer glow arc (wide, semi-transparent, static)
+    state.arcs.push({
+      startLat: lat, startLng: lng,
+      endLat: actual.lat, endLng: actual.lng,
+      color: ['rgba(232,150,32,0.22)', 'rgba(0,201,167,0.22)'],
+      stroke: 1.9, altitude: 0.3, dashLength: 1, dashGap: 0, dashTime: 0,
+    });
+    // Bright animated traveler dot
     state.arcs.push({
       startLat: lat, startLng: lng,
       endLat: actual.lat, endLng: actual.lng,
       color: ['#e89620', '#00c9a7'],
+      stroke: 0.38, altitude: 0.3, dashLength: 0.07, dashGap: 0.93, dashTime: 1600,
     });
     state.labels.push({ lat: actual.lat, lng: actual.lng, text: actual.name, color: '#00c9a7' });
 
@@ -550,10 +584,7 @@ async function confirmGuess() {
     globe.pointsData([...state.markers]);
     globe.ringsData([...state.rings]);
     globe.arcsData([...state.arcs]);
-    globe.labelsData([
-      ...(WORLD_CONFIG[world]?.showOceans ? OCEAN_LABELS : []),
-      ...state.labels,
-    ]);
+    globe.labelsData([...state.labels]);
     if (world === 'earth') showCountryHighlight(country);
 
     // Update score display immediately
@@ -773,9 +804,11 @@ function showRank(rank) {
 function startCountdown() {
   function update() {
     const now      = Date.now();
+    // Build next UTC midnight unambiguously: advance date by 1 day, zero out time
     const midnight = new Date();
-    midnight.setUTCHours(24, 0, 0, 0);
-    const diff = midnight.getTime() - now;
+    midnight.setUTCDate(midnight.getUTCDate() + 1);
+    midnight.setUTCHours(0, 0, 0, 0);
+    const diff = Math.max(0, midnight.getTime() - now);
 
     const h = String(Math.floor(diff / 3_600_000)).padStart(2, '0');
     const m = String(Math.floor((diff % 3_600_000) / 60_000)).padStart(2, '0');
@@ -945,7 +978,7 @@ function setGlobeWorld(world) {
     .atmosphereAltitude(cfg.atmosphereAlt);
 
   // Ocean labels only make sense on Earth
-  globe.labelsData(cfg.showOceans ? [...OCEAN_LABELS, ...state.labels] : [...state.labels]);
+  globe.labelsData([...state.labels]);
 }
 
 // ── Init ───────────────────────────────────────────────────
@@ -967,6 +1000,8 @@ async function init() {
     qs('#results-fab').setAttribute('hidden', '');
     qs('#game-over').removeAttribute('hidden');
   });
+  qs('#flat-btn')?.addEventListener('click', toggleFlatEarth);
+  qs('#game-title').addEventListener('dblclick', toggleFlatEarth);
 
   // Auth init and puzzle fetch run in parallel
   try {
@@ -993,7 +1028,10 @@ async function init() {
         state.markers.push({ id: `guess-${i}`,  lat: g.lat, lng: g.lng, color: '#e89620', size: 0.2,  altitude: 0.07 });
         if (a) {
           state.markers.push({ id: `actual-${i}`, lat: a.lat, lng: a.lng, color: '#00c9a7', size: 0.28, altitude: 0.06 });
-          state.arcs.push({ startLat: g.lat, startLng: g.lng, endLat: a.lat, endLng: a.lng, color: ['#e89620', '#00c9a7'] });
+          state.arcs.push(
+            { startLat: g.lat, startLng: g.lng, endLat: a.lat, endLng: a.lng, color: ['rgba(232,150,32,0.22)', 'rgba(0,201,167,0.22)'], stroke: 1.9, altitude: 0.3, dashLength: 1, dashGap: 0, dashTime: 0 },
+            { startLat: g.lat, startLng: g.lng, endLat: a.lat, endLng: a.lng, color: ['#e89620', '#00c9a7'], stroke: 0.38, altitude: 0.3, dashLength: 0.07, dashGap: 0.93, dashTime: 1600 },
+          );
           state.labels.push({ lat: a.lat, lng: a.lng, text: a.name, color: '#00c9a7' });
           state.rings.push({ lat: a.lat, lng: a.lng });
         }
@@ -1013,7 +1051,7 @@ async function init() {
       globe.pointsData([...state.markers]);
       globe.arcsData([...state.arcs]);
       globe.ringsData([...state.rings]);
-      globe.labelsData([...OCEAN_LABELS, ...state.labels]);
+      globe.labelsData([...state.labels]);
       // Already played — go straight to results
       setTimeout(() => showGameOver(true), 650);
     } else {
