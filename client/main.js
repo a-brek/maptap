@@ -840,10 +840,10 @@ function showRank(rank) {
 function startCountdown() {
   function update() {
     const now      = Date.now();
-    // Build next UTC midnight unambiguously: advance date by 1 day, zero out time
+    // Build next local midnight
     const midnight = new Date();
-    midnight.setUTCDate(midnight.getUTCDate() + 1);
-    midnight.setUTCHours(0, 0, 0, 0);
+    midnight.setDate(midnight.getDate() + 1);
+    midnight.setHours(0, 0, 0, 0);
     const diff = Math.max(0, midnight.getTime() - now);
 
     const h = String(Math.floor(diff / 3_600_000)).padStart(2, '0');
