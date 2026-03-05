@@ -732,6 +732,19 @@ function nextRound() {
 }
 
 // ── localStorage persistence ───────────────────────────────
+function pruneOldResults(todayStr) {
+  try {
+    const toDelete = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('tapmap-result-') && !key.endsWith(todayStr)) {
+        toDelete.push(key);
+      }
+    }
+    toDelete.forEach(k => localStorage.removeItem(k));
+  } catch (_) {}
+}
+
 function saveResultLocally() {
   try {
     localStorage.setItem(`tapmap-result-${state.date}`, JSON.stringify({
@@ -1020,6 +1033,8 @@ async function init() {
 
     state.puzzle = puzzle;
     state.date   = puzzle.date;
+
+    pruneOldResults(puzzle.date);
 
     // Check if this puzzle was already completed today
     const saved = loadResultLocally(puzzle.date);
