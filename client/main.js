@@ -409,10 +409,10 @@ function initGlobe() {
     .labelLat('lat')
     .labelLng('lng')
     .labelText('text')
-    .labelSize(d => d.ocean ? 0.55 : 0.75)
+    .labelSize(d => d.isCountryName ? 0.28 : (d.ocean ? 0.55 : 0.75))
     .labelColor('color')
-    .labelDotRadius(d => d.ocean ? 0 : 0.32)
-    .labelIncludeDot(d => !d.ocean)
+    .labelDotRadius(d => (d.ocean || d.isCountryName) ? 0 : 0.32)
+    .labelIncludeDot(d => !d.ocean && !d.isCountryName)
     .labelAltitude(0.025)
     .labelResolution(3)
     // HTML elements (UFO)
@@ -486,6 +486,68 @@ async function showCountryHighlight(countryName) {
 
 function clearCountryHighlight() {
   globe.polygonsData([]);
+}
+
+function _polyRingCentroid(ring) {
+  let x = 0, y = 0;
+  for (const [lng, lat] of ring) { x += lng; y += lat; }
+  return [x / ring.length, y / ring.length];
+}
+
+function _featureCentroid(feature) {
+  try {
+    const geom = feature.geometry;
+    if (geom.type === 'Polygon') {
+      return _polyRingCentroid(geom.coordinates[0]);
+    } else if (geom.type === 'MultiPolygon') {
+      let best = null, bestLen = 0;
+      for (const poly of geom.coordinates) {
+        if (poly[0].length > bestLen) { bestLen = poly[0].length; best = poly[0]; }
+      }
+      return best ? _polyRingCentroid(best) : null;
+    }
+  } catch (_) {}
+  return null;
+}
+
+async function showAllCountryBordersAndNames() {
+  try {
+    const geo = await loadWorldGeo();
+
+    // Build set of highlighted countries from all correct answers
+    const highlightSet = new Set();
+    state.roundScores.forEach(r => { if (r.country) highlightSet.add(r.country.toLowerCase()); });
+    state.actuals.forEach(a => {
+      const parts = a.name.split(',');
+      const c = (parts.length > 1 ? parts[parts.length - 1].trim() : a.name).toLowerCase();
+      highlightSet.add(c);
+    });
+
+    function isHighlighted(f) {
+      const name = (f.properties.name || '').toLowerCase();
+      for (const h of highlightSet) {
+        if (name === h || name.includes(h) || h.includes(name)) return true;
+      }
+      return false;
+    }
+
+    // Country name labels from centroids
+    const countryLabels = geo.features.map(f => {
+      const c = _featureCentroid(f);
+      if (!c) return null;
+      return { lat: c[1], lng: c[0], text: f.properties.name, color: 'rgba(200,220,255,0.5)', isCountryName: true };
+    }).filter(Boolean);
+
+    globe.labelsData([...state.labels, ...countryLabels]);
+
+    globe
+      .polygonsData(geo.features)
+      .polygonCapColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.15)' : 'rgba(255,255,255,0.02)')
+      .polygonSideColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.08)' : 'rgba(255,255,255,0.01)')
+      .polygonStrokeColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.9)' : 'rgba(200,220,255,0.3)');
+  } catch (err) {
+    console.warn('Failed to show country borders:', err);
+  }
 }
 
 // ── API ────────────────────────────────────────────────────
@@ -825,6 +887,7 @@ function showGameOver(skipSave = false) {
     requestAnimationFrame(() => overlay.classList.add('visible'));
   });
 
+  showAllCountryBordersAndNames();
   startCountdown();
 
   // Save score + show rank (async — updates UI when server responds)
