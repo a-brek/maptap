@@ -801,6 +801,7 @@ async function confirmGuess() {
     setTimeout(() => scoreEl.classList.remove('score-flash'), 420);
     animateCounter(scoreEl, prevTotal, state.totalScore);
 
+    saveResultLocally();
     updatePips(state.round, 'done');
 
     // Score popup after fly-in
@@ -1311,8 +1312,13 @@ async function init() {
       globe.arcsData([...state.arcs]);
       globe.ringsData([...state.rings]);
       globe.labelsData([ZAC_LABEL, ...state.labels]);
-      // Already played — go straight to results
-      setTimeout(() => showGameOver(true), 650);
+      const isComplete = state.roundScores.length >= 5;
+      state.round = isComplete ? 5 : state.roundScores.length;
+      if (isComplete) {
+        setTimeout(() => showGameOver(true), 650);
+      } else {
+        setTimeout(() => showCluePanel(), 650);
+      }
     } else {
       // Show first clue after short delay (globe is animating in)
       setTimeout(() => showCluePanel(), 650);
