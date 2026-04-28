@@ -105,7 +105,6 @@ function endRound(io, room) {
         distanceKm: Math.round(distKm),
         timeRemaining: Math.round(timeRemaining * 10) / 10,
         guess: { lat: guess.lat, lng: guess.lng },
-        photo: guess.photo || null,
         noGuess: false,
       };
       player.totalScore += total;
@@ -228,11 +227,7 @@ function attachCompetition(io, sessionMiddleware) {
       const lng = parseFloat(payload?.lng);
       if (isNaN(lat) || isNaN(lng)) return;
 
-      // Accept photo only if it looks like a small base64 JPEG (max ~15KB)
-      const photo = typeof payload?.photo === 'string' && payload.photo.startsWith('data:image/jpeg;base64,') && payload.photo.length < 20000
-        ? payload.photo : null;
-
-      room.roundGuesses.set(socket.id, { lat, lng, submittedAt: Date.now(), photo });
+      room.roundGuesses.set(socket.id, { lat, lng, submittedAt: Date.now() });
       socket.emit('game:guess-ack', { received: true });
 
       const player = room.players.get(socket.id);

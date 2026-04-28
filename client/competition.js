@@ -26,37 +26,6 @@ const state = {
 
 let globe = null;
 
-// ── Camera ─────────────────────────────────────────────────
-let _camStream = null;
-
-async function initCamera() {
-  try {
-    _camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 160, height: 120 }, audio: false });
-    const video = qs('#cam-preview');
-    video.srcObject = _camStream;
-    video.classList.add('visible');
-  } catch (_) {
-    // camera denied or unavailable — silent, game continues fine
-  }
-}
-
-function capturePhoto() {
-  if (!_camStream) return null;
-  try {
-    const video  = qs('#cam-preview');
-    const canvas = qs('#cam-canvas');
-    const ctx    = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, 160, 120);
-    return canvas.toDataURL('image/jpeg', 0.6);
-  } catch (_) { return null; }
-}
-
-function stopCamera() {
-  _camStream?.getTracks().forEach(t => t.stop());
-  _camStream = null;
-  qs('#cam-preview').classList.remove('visible');
-}
-
 // ── Globe Setup ─────────────────────────────────────────────
 function randomGlobeView(altitude = 2.2) {
   return {
@@ -164,8 +133,7 @@ function handleGlobeClick(lat, lng) {
 function confirmGuess() {
   if (!state.pendingGuess || state.guessSubmitted) return;
   state.guessSubmitted = true;
-  const photo = capturePhoto();
-  state.socket.emit('game:guess', { lat: state.pendingGuess.lat, lng: state.pendingGuess.lng, photo });
+  state.socket.emit('game:guess', { lat: state.pendingGuess.lat, lng: state.pendingGuess.lng });
 
   const btn = qs('#confirm-btn');
   btn.textContent = 'Guess submitted!';
@@ -307,28 +275,6 @@ function showRoundResults(data) {
   if (myResult) {
     state.totalScore = myResult.totalScore;
     qs('#score-display').textContent = state.totalScore;
-  }
-
-  // Reaction photo grid
-  const grid = qs('#reaction-grid');
-  grid.innerHTML = '';
-  const photosExist = results.some(r => r.roundScore?.photo);
-  if (photosExist) {
-    results.forEach(r => {
-      const item = document.createElement('div');
-      item.className = 'reaction-item';
-      const isMe = r.socketId === state.mySocketId;
-      if (r.roundScore?.photo) {
-        item.innerHTML = `
-          <img class="reaction-photo${isMe ? ' is-me' : ''}" src="${r.roundScore.photo}" alt="${escapeHtml(r.displayName)}" />
-          <div class="reaction-name">${escapeHtml(r.displayName)}</div>`;
-      } else {
-        item.innerHTML = `
-          <div class="reaction-no-photo">🌍</div>
-          <div class="reaction-name">${escapeHtml(r.displayName)}</div>`;
-      }
-      grid.appendChild(item);
-    });
   }
 
   // Build results table
@@ -474,7 +420,6 @@ function initSocket() {
   socket.on('game:starting', () => {
     showGameUI();
     showStartingCountdown(3000);
-    initCamera();
   });
 
   socket.on('game:round-start', (data) => {
@@ -495,7 +440,6 @@ function initSocket() {
   });
 
   socket.on('game:finished', (data) => {
-    stopCamera();
     showFinalStandings(data);
   });
 }
