@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Tap Map — Live</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=IBM+Plex+Sans+Condensed:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* ── Competition-specific styles ── */
+    .back-link {
+      font-family: var(--font-mono);
+      font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--text-dim);
+      text-decoration: none;
+      border: 1px solid var(--border-hi);
+      padding: 5px 8px;
+      display: inline-flex; align-items: center; gap: 5px;
+      transition: color var(--t), border-color var(--t);
+    }
+    .back-link:hover { color: var(--amber); border-color: var(--amber-dim); }
+
+    /* ── Lobby overlay ── */
+    #lobby {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 13, 20, 0.97);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    #lobby[hidden] { display: none; }
+
+    .lobby-card {
+      width: min(440px, calc(100vw - 32px));
+      background: var(--bg-panel, #0e1420);
+      border: 1px solid var(--border-hi, rgba(0,201,167,0.18));
+      padding: 32px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .lobby-title {
+      font-family: var(--font-display, 'Bebas Neue', sans-serif);
+      font-size: 32px;
+      letter-spacing: 0.06em;
+      color: var(--teal, #00c9a7);
+      line-height: 1;
+    }
+    .lobby-subtitle {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-top: -14px;
+    }
+
+    .lobby-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .lobby-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .lobby-input {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      letter-spacing: 0.06em;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border-hi);
+      color: var(--text-primary, #e8e8e8);
+      padding: 10px 12px;
+      outline: none;
+      width: 100%;
+      box-sizing: border-box;
+      text-transform: uppercase;
+    }
+    .lobby-input:focus { border-color: var(--teal); }
+
+    .lobby-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .lobby-btn {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      background: none;
+      border: 1px solid var(--teal-dim, rgba(0,201,167,0.4));
+      color: var(--teal);
+      padding: 10px 16px;
+      flex: 1;
+      cursor: pointer;
+      transition: background var(--t), color var(--t);
+    }
+    .lobby-btn:hover { background: var(--teal-glow, rgba(0,201,167,0.08)); }
+    .lobby-btn.primary {
+      background: rgba(0,201,167,0.12);
+      border-color: var(--teal);
+    }
+    .lobby-btn.primary:hover { background: rgba(0,201,167,0.22); }
+    .lobby-btn:disabled { opacity: 0.4; cursor: default; }
+
+    #lobby-error {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: #ff6b6b;
+      min-height: 14px;
+    }
+
+    /* Waiting room */
+    #lobby-waiting { display: none; flex-direction: column; gap: 16px; }
+    #lobby-waiting.visible { display: flex; }
+    #lobby-join-form { display: flex; flex-direction: column; gap: 16px; }
+    #lobby-join-form.hidden-form { display: none; }
+
+    .room-code-display {
+      font-family: var(--font-display);
+      font-size: 48px;
+      letter-spacing: 0.14em;
+      color: var(--amber, #f4b942);
+      text-align: center;
+      padding: 12px 0 4px;
+    }
+    .room-code-hint {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      text-align: center;
+    }
+
+    .player-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .player-list li {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--text-primary);
+      padding: 7px 10px;
+      background: rgba(255,255,255,0.03);
+      border-left: 2px solid transparent;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .player-list li.is-host { border-left-color: var(--amber); }
+    .player-host-badge {
+      font-size: 8px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--amber);
+      background: rgba(244,185,66,0.12);
+      padding: 1px 5px;
+    }
+    .player-list li.is-you { color: var(--teal); }
+
+    .waiting-status {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      text-align: center;
+    }
+
+    /* ── In-game HUD additions ── */
+    #timer-display {
+      font-family: var(--font-display);
+      font-size: 52px;
+      letter-spacing: 0.04em;
+      line-height: 1;
+      color: var(--teal);
+      transition: color 0.3s;
+      text-align: center;
+    }
+    #timer-display.urgent { color: #ff6b6b; }
+
+    #hud-timer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    /* ── Players-guessed ticker ── */
+    #guess-ticker {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      z-index: 50;
+      pointer-events: none;
+    }
+    .guess-notification {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      color: var(--teal);
+      background: rgba(0,201,167,0.1);
+      border: 1px solid rgba(0,201,167,0.25);
+      padding: 4px 12px;
+      animation: fadeSlideUp 2.5s ease forwards;
+    }
+    @keyframes fadeSlideUp {
+      0%   { opacity: 0; transform: translateY(8px); }
+      15%  { opacity: 1; transform: translateY(0); }
+      70%  { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-6px); }
+    }
+
+    /* ── Round results panel ── */
+    #round-results {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 13, 20, 0.92);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 120;
+    }
+    #round-results[hidden] { display: none; }
+
+    .results-card {
+      width: min(500px, calc(100vw - 32px));
+      background: var(--bg-panel, #0e1420);
+      border: 1px solid var(--border-hi);
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .results-header {
+      font-family: var(--font-display);
+      font-size: 22px;
+      letter-spacing: 0.08em;
+      color: var(--teal);
+    }
+    .results-location {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-top: -10px;
+    }
+
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .results-table th {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      text-align: left;
+      padding: 4px 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .results-table td {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-primary);
+      padding: 6px 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .results-table tr.is-me td { color: var(--teal); }
+    .results-table td.score-total {
+      font-family: var(--font-display);
+      font-size: 16px;
+      color: var(--amber);
+    }
+    .results-table td.no-guess { color: var(--text-dim); font-style: italic; }
+    .results-next-in {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      text-align: center;
+    }
+
+    /* ── Game over ── */
+    #comp-game-over {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 13, 20, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 150;
+    }
+    #comp-game-over[hidden] { display: none; }
+
+    .final-card {
+      width: min(500px, calc(100vw - 32px));
+      background: var(--bg-panel, #0e1420);
+      border: 1px solid var(--border-hi);
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .final-title {
+      font-family: var(--font-display);
+      font-size: 28px;
+      letter-spacing: 0.08em;
+      color: var(--teal);
+    }
+
+    .podium-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .podium-entry {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 10px;
+      background: rgba(255,255,255,0.03);
+    }
+    .podium-entry.rank-1 { background: rgba(244,185,66,0.08); border-left: 3px solid var(--amber); }
+    .podium-entry.rank-2 { background: rgba(200,200,220,0.05); border-left: 3px solid #aab; }
+    .podium-entry.rank-3 { border-left: 3px solid #a67c52; }
+    .podium-rank {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--text-dim);
+      width: 28px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .podium-entry.rank-1 .podium-rank { color: var(--amber); }
+    .podium-name {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      color: var(--text-primary);
+      flex: 1;
+    }
+    .podium-entry.is-me .podium-name { color: var(--teal); }
+    .podium-score {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--amber);
+    }
+
+    .final-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    /* Countdown overlay before game starts */
+    #starting-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 13, 20, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 110;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #starting-overlay[hidden] { display: none; }
+    #starting-countdown {
+      font-family: var(--font-display);
+      font-size: 96px;
+      color: var(--teal);
+    }
+    .starting-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── 3D Globe ─────────────────────────────────────────── -->
+  <div id="globe-container"></div>
+
+  <!-- ── HUD Header ───────────────────────────────────────── -->
+  <header id="hud" hidden>
+    <div id="game-title">
+      TAP<span> MAP</span>
+    </div>
+
+    <div class="hud-center">
+      <div id="hud-timer">
+        <div class="hud-label">Time</div>
+        <div id="timer-display">10</div>
+      </div>
+    </div>
+
+    <div class="hud-right">
+      <div class="hud-score-col">
+        <div class="hud-label">Round</div>
+        <div id="round-display">1 / 5</div>
+      </div>
+      <div class="hud-score-col">
+        <div class="hud-label">Score</div>
+        <div id="score-display">0</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Clue Panel ─────────────────────────────────────────── -->
+  <aside id="clue-panel" aria-live="polite" hidden>
+    <div class="panel-header">
+      <div id="round-number">01</div>
+      <div id="round-label">Round 1 of 5</div>
+    </div>
+    <div class="panel-divider"></div>
+    <p id="location-clue"></p>
+    <p id="location-sub">Where in the world?</p>
+
+    <p id="guess-prompt">Click the globe to place your guess</p>
+    <button id="confirm-btn" type="button" class="btn-primary" hidden>Confirm Guess</button>
+  </aside>
+
+  <!-- ── Players-guessed ticker ── -->
+  <div id="guess-ticker"></div>
+
+  <!-- ── Starting overlay ── -->
+  <div id="starting-overlay" hidden>
+    <div class="starting-label">Game starting in</div>
+    <div id="starting-countdown">3</div>
+  </div>
+
+  <!-- ── Round Results ── -->
+  <div id="round-results" hidden>
+    <div class="results-card">
+      <div class="results-header" id="results-round-title">Round 1 Results</div>
+      <div class="results-location" id="results-location-name"></div>
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Player</th>
+            <th>Accuracy</th>
+            <th>Speed</th>
+            <th>Round</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="results-tbody"></tbody>
+      </table>
+      <div class="results-next-in" id="results-next-label">Next round in 5s…</div>
+    </div>
+  </div>
+
+  <!-- ── Game Over ── -->
+  <div id="comp-game-over" hidden>
+    <div class="final-card">
+      <div class="final-title">Final Standings</div>
+      <div class="podium-row" id="podium-row"></div>
+      <div class="final-actions">
+        <a href="/compete" class="lobby-btn" style="text-align:center;text-decoration:none;display:block;">Play Again</a>
+        <a href="/" class="lobby-btn" style="text-align:center;text-decoration:none;display:block;">← Daily Puzzle</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Lobby overlay ── -->
+  <div id="lobby">
+    <div class="lobby-card">
+      <div>
+        <div class="lobby-title">TAP MAP <span style="color:var(--amber)">LIVE</span></div>
+        <div class="lobby-subtitle">Real-time competition</div>
+      </div>
+
+      <!-- Join / Create form -->
+      <div id="lobby-join-form">
+        <div class="lobby-field">
+          <label class="lobby-label" for="name-input">Your name</label>
+          <input id="name-input" class="lobby-input" type="text" maxlength="20" placeholder="ENTER NAME" autocomplete="off" />
+        </div>
+
+        <div class="lobby-field" id="code-field" style="display:none">
+          <label class="lobby-label" for="code-input">Room code</label>
+          <input id="code-input" class="lobby-input" type="text" maxlength="6" placeholder="XXXXXX" autocomplete="off" />
+        </div>
+
+        <div id="lobby-error"></div>
+
+        <div class="lobby-actions">
+          <button id="create-btn" class="lobby-btn primary">Create Room</button>
+          <button id="join-toggle-btn" class="lobby-btn">Join Room</button>
+        </div>
+      </div>
+
+      <!-- Waiting room -->
+      <div id="lobby-waiting">
+        <div>
+          <div class="room-code-display" id="room-code-display"></div>
+          <div class="room-code-hint">Share this code to invite players</div>
+        </div>
+
+        <ul class="player-list" id="player-list"></ul>
+
+        <div class="waiting-status" id="waiting-status">Waiting for players…</div>
+
+        <div id="lobby-error-waiting"></div>
+
+        <div class="lobby-actions">
+          <button id="start-btn" class="lobby-btn primary" hidden>Start Game</button>
+        </div>
+
+        <a href="/" class="back-link" style="align-self:flex-start">← Back to Daily</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Loading ── -->
+  <div id="loading" aria-label="Loading">
+    <div class="loading-title">TAP MAP</div>
+    <div class="spinner" aria-hidden="true"></div>
+    <div class="loading-text">Connecting…</div>
+  </div>
+
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/globe.gl@2.27.0"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="competition.js"></script>
+</body>
+</html>

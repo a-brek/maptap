@@ -177,3 +177,7 @@ router.post('/:date/reveal/:round', (req, res) => {
 });
 
 module.exports = router;
+module.exports.getLocationsForDate = getLocationsForDate;
+module.exports.haversine           = haversine;
+module.exports.calcScore           = calcScore;
+module.exports.WORLD_PARAMS        = WORLD_PARAMS;

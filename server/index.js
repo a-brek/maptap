@@ -2,6 +2,8 @@
 
 require('dotenv').config();
 
+const http        = require('http');
+const { Server: SocketIO } = require('socket.io');
 const express     = require('express');
 const cors        = require('cors');
 const helmet      = require('helmet');
@@ -13,6 +15,7 @@ const { Strategy: LocalStrategy }  = require('passport-local');
 const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
 const bcrypt      = require('bcryptjs');
 const path        = require('path');
+const { attachCompetition } = require('./competition');
 
 const db              = require('./db');
 const { pool }        = db;
@@ -33,7 +36,7 @@ app.use(compression());
 app.use(express.json());
 
 // ── Sessions ──────────────────────────────────────────────
-app.use(session({
+const sessionMiddleware = session({
   store: new pgSession({
     pool,
     tableName: 'session',
@@ -47,7 +50,8 @@ app.use(session({
     secure:   process.env.NODE_ENV === 'production',
     maxAge:   30 * 24 * 60 * 60 * 1000,
   },
-}));
+});
+app.use(sessionMiddleware);
 
 // ── Passport ──────────────────────────────────────────────
 app.use(passport.initialize());
@@ -145,7 +149,8 @@ app.use('/api/analytics',   analyticsRoutes);
 
 // ── Serve Client ──────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '../client')));
-app.get('/practice', (_req, res) => res.sendFile(path.join(__dirname, '../client/practice.html')));
+app.get('/practice',  (_req, res) => res.sendFile(path.join(__dirname, '../client/practice.html')));
+app.get('/compete',   (_req, res) => res.sendFile(path.join(__dirname, '../client/competition.html')));
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, '../client/index.html')));
 
 // ── Global Error Handler ──────────────────────────────────
@@ -154,7 +159,12 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 
-app.listen(PORT, async () => {
+// ── Socket.io ─────────────────────────────────────────────
+const httpServer = http.createServer(app);
+const io = new SocketIO(httpServer, { cors: { origin: true, credentials: true } });
+attachCompetition(io, sessionMiddleware);
+
+httpServer.listen(PORT, async () => {
   // Add game_data column if not present (safe to re-run)
   try {
     await db.query(`ALTER TABLE daily_scores ADD COLUMN IF NOT EXISTS game_data JSONB`);
