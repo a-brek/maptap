@@ -300,6 +300,69 @@
       color: var(--amber);
     }
     .results-table td.no-guess { color: var(--text-dim); font-style: italic; }
+    /* ── Reaction photos ── */
+    .reaction-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 4px 0 8px;
+    }
+    .reaction-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .reaction-photo {
+      width: 72px;
+      height: 54px;
+      object-fit: cover;
+      border: 2px solid rgba(255,255,255,0.08);
+      border-radius: 2px;
+      transform: scaleX(-1); /* mirror front cam */
+    }
+    .reaction-photo.is-me { border-color: var(--teal); }
+    .reaction-name {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      max-width: 72px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: center;
+    }
+    .reaction-no-photo {
+      width: 72px;
+      height: 54px;
+      background: rgba(255,255,255,0.04);
+      border: 2px solid rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    /* Camera preview pip */
+    #cam-preview {
+      position: fixed;
+      bottom: 80px;
+      right: 16px;
+      width: 72px;
+      height: 54px;
+      object-fit: cover;
+      border: 1px solid rgba(0,201,167,0.3);
+      border-radius: 2px;
+      transform: scaleX(-1);
+      opacity: 0.7;
+      z-index: 60;
+      display: none;
+    }
+    #cam-preview.visible { display: block; }
+
     .results-next-in {
       font-family: var(--font-mono);
       font-size: 9px;
@@ -453,6 +516,10 @@
     <button id="confirm-btn" type="button" class="btn-primary" hidden>Confirm Guess</button>
   </aside>
 
+  <!-- ── Camera (hidden capture elements) ── -->
+  <video id="cam-preview" autoplay playsinline muted></video>
+  <canvas id="cam-canvas" style="display:none" width="160" height="120"></canvas>
+
   <!-- ── Players-guessed ticker ── -->
   <div id="guess-ticker"></div>
 
@@ -467,6 +534,7 @@
     <div class="results-card">
       <div class="results-header" id="results-round-title">Round 1 Results</div>
       <div class="results-location" id="results-location-name"></div>
+      <div class="reaction-grid" id="reaction-grid"></div>
       <table class="results-table">
         <thead>
           <tr>
