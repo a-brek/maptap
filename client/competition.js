@@ -177,12 +177,13 @@ function renderPlayerList(players) {
   qs('#waiting-status').textContent = `${players.length} player${players.length !== 1 ? 's' : ''} in lobby`;
 }
 
-function showLobbyWaiting(code, players, isHost) {
+function showLobbyWaiting(code, players, isHost, roomName) {
   state.roomCode = code;
   state.isHost   = isHost;
   qs('#lobby-join-form').classList.add('hidden-form');
   qs('#lobby-waiting').classList.add('visible');
   qs('#room-code-display').textContent = code;
+  qs('#room-name-display').textContent = roomName || '';
   renderPlayerList(players);
   const startBtn = qs('#start-btn');
   if (isHost) {
@@ -385,14 +386,14 @@ function initSocket() {
     qs('#loading').removeAttribute('hidden');
   });
 
-  socket.on('room:created', ({ code, players, isHost }) => {
-    showLobbyWaiting(code, players, isHost);
+  socket.on('room:created', ({ code, players, isHost, roomName }) => {
+    showLobbyWaiting(code, players, isHost, roomName);
     history.replaceState(null, '', `/compete?code=${code}`);
   });
 
-  socket.on('room:joined', ({ code, players, isHost }) => {
+  socket.on('room:joined', ({ code, players, isHost, roomName }) => {
     state.mySocketId = socket.id;
-    showLobbyWaiting(code, players, isHost);
+    showLobbyWaiting(code, players, isHost, roomName);
     history.replaceState(null, '', `/compete?code=${code}`);
   });
 
@@ -449,6 +450,7 @@ let _joinMode = false;
 function switchToJoinMode() {
   _joinMode = true;
   qs('#code-field').style.display = '';
+  qs('#room-name-field').style.display = 'none';
   qs('#create-btn').style.display = 'none';
   qs('#join-toggle-btn').textContent = 'Join';
   qs('#join-toggle-btn').classList.add('primary');
@@ -466,8 +468,9 @@ function handleCreateOrJoin(isJoin) {
     state.displayName = name;
     state.socket.emit('room:join', { code, displayName: name });
   } else {
+    const roomName = qs('#room-name-input').value.trim();
     state.displayName = name;
-    state.socket.emit('room:create', { displayName: name });
+    state.socket.emit('room:create', { displayName: name, roomName: roomName || null });
   }
 }
 

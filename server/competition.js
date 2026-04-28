@@ -24,8 +24,9 @@ function todayStr() {
 }
 
 class Room {
-  constructor(code, hostSocketId) {
+  constructor(code, hostSocketId, roomName) {
     this.code         = code;
+    this.roomName     = roomName || null;
     this.hostId       = hostSocketId;
     this.state        = 'waiting';
     this.players      = new Map();
@@ -157,8 +158,11 @@ function attachCompetition(io, sessionMiddleware) {
       const displayName = resolveDisplayName(payload);
       if (!displayName) return socket.emit('room:error', { message: 'Invalid display name (1–20 chars)' });
 
+      const rawRoomName = payload?.roomName;
+      const roomName = rawRoomName ? String(rawRoomName).replace(/[<>&"']/g, '').trim().slice(0, 30) || null : null;
+
       const code = generateCode();
-      const room = new Room(code, socket.id);
+      const room = new Room(code, socket.id, roomName);
       rooms.set(code, room);
       socketToRoom.set(socket.id, code);
 
@@ -171,7 +175,7 @@ function attachCompetition(io, sessionMiddleware) {
       });
 
       socket.join(code);
-      socket.emit('room:created', { code, players: room.playerList(), isHost: true });
+      socket.emit('room:created', { code, players: room.playerList(), isHost: true, roomName: room.roomName });
     });
 
     socket.on('room:join', (payload) => {
@@ -193,7 +197,7 @@ function attachCompetition(io, sessionMiddleware) {
       });
 
       socket.join(room.code);
-      socket.emit('room:joined', { code: room.code, players: room.playerList(), isHost: false });
+      socket.emit('room:joined', { code: room.code, players: room.playerList(), isHost: false, roomName: room.roomName });
       socket.to(room.code).emit('room:players-updated', { players: room.playerList() });
     });
 

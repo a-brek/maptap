@@ -511,6 +511,11 @@
           <input id="name-input" class="lobby-input" type="text" maxlength="20" placeholder="ENTER YOUR NAME" autocomplete="off" />
         </div>
 
+        <div class="lobby-field" id="room-name-field">
+          <label class="lobby-label" for="room-name-input">Room name (optional)</label>
+          <input id="room-name-input" class="lobby-input" type="text" maxlength="30" placeholder="E.G. FRIDAY NIGHT" autocomplete="off" />
+        </div>
+
         <div class="lobby-field" id="code-field" style="display:none">
           <label class="lobby-label" for="code-input">Room code</label>
           <input id="code-input" class="lobby-input" type="text" maxlength="6" placeholder="XXXXXX" autocomplete="off" />
@@ -527,6 +532,7 @@
       <!-- Waiting room -->
       <div id="lobby-waiting">
         <div>
+          <div id="room-name-display" style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--amber);text-align:center;min-height:16px;"></div>
           <div class="room-code-display" id="room-code-display"></div>
           <div class="room-code-hint">Share this code to invite players</div>
         </div>
