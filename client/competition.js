@@ -9,8 +9,22 @@ const AVATAR_SEEDS = [
   'rio','max','sage','rebel','ace','flash','neo','storm',
   'raven','blaze','zen','kit','wolf','fox','crow','jay',
 ];
-function avatarUrl(seed) {
-  return `https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(seed)}&size=64`;
+const AVATAR_STYLES = ['pixel-art', 'bottts', 'adventurer', 'big-ears'];
+
+// Interleave styles so you see variety immediately
+const AVATARS = [];
+for (let i = 0; i < AVATAR_SEEDS.length; i++) {
+  for (const style of AVATAR_STYLES) {
+    AVATARS.push({ style, seed: AVATAR_SEEDS[i] });
+  }
+}
+
+function avatarUrl(avatar) {
+  if (!avatar) return avatarUrl({ style: 'pixel-art', seed: 'felix' });
+  const { style, seed } = typeof avatar === 'string'
+    ? { style: 'pixel-art', seed: avatar }  // backwards compat
+    : avatar;
+  return `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}&size=64`;
 }
 
 // ── State ──────────────────────────────────────────────────
@@ -20,7 +34,7 @@ const state = {
   isHost:         false,
   mySocketId:     null,
   displayName:    null,
-  avatar:         AVATAR_SEEDS[0],
+  avatar:         AVATARS[0],
   round:          -1,
   totalScore:     0,
   roundActive:    false,
@@ -492,15 +506,14 @@ function handleCreateOrJoin(isJoin) {
 // ── Avatar picker ───────────────────────────────────────────
 function initAvatarPicker() {
   const picker = qs('#avatar-picker');
-  AVATAR_SEEDS.forEach((seed, i) => {
+  AVATARS.forEach((avatar, i) => {
     const div = document.createElement('div');
     div.className = 'avatar-option' + (i === 0 ? ' selected' : '');
-    div.dataset.seed = seed;
-    div.innerHTML = `<img src="${avatarUrl(seed)}" alt="${seed}" loading="lazy" />`;
+    div.innerHTML = `<img src="${avatarUrl(avatar)}" alt="${avatar.seed}" loading="lazy" />`;
     div.addEventListener('click', () => {
       qs('.avatar-option.selected')?.classList.remove('selected');
       div.classList.add('selected');
-      state.avatar = seed;
+      state.avatar = avatar;
     });
     picker.appendChild(div);
   });

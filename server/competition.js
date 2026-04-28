@@ -49,11 +49,12 @@ class Room {
   }
 }
 
-const VALID_AVATARS = new Set([
+const VALID_SEEDS = new Set([
   'felix','aneka','oliver','orion','luna','nova','atlas','echo',
   'rio','max','sage','rebel','ace','flash','neo','storm',
   'raven','blaze','zen','kit','wolf','fox','crow','jay',
 ]);
+const VALID_STYLES = new Set(['pixel-art','bottts','adventurer','big-ears']);
 
 function sanitizeName(name) {
   if (typeof name !== 'string') return null;
@@ -62,9 +63,17 @@ function sanitizeName(name) {
   return s;
 }
 
-function sanitizeAvatar(seed) {
-  if (typeof seed === 'string' && VALID_AVATARS.has(seed)) return seed;
-  return 'felix';
+function sanitizeAvatar(avatar) {
+  // Accept {style, seed} object or legacy string seed
+  if (avatar && typeof avatar === 'object') {
+    const style = VALID_STYLES.has(avatar.style) ? avatar.style : 'pixel-art';
+    const seed  = VALID_SEEDS.has(avatar.seed)   ? avatar.seed  : 'felix';
+    return { style, seed };
+  }
+  if (typeof avatar === 'string' && VALID_SEEDS.has(avatar)) {
+    return { style: 'pixel-art', seed: avatar };
+  }
+  return { style: 'pixel-art', seed: 'felix' };
 }
 
 function checkAllGuessed(io, room) {
