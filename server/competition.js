@@ -42,17 +42,29 @@ class Room {
     return [...this.players.values()].map(p => ({
       socketId:    p.socketId,
       displayName: p.displayName,
+      avatar:      p.avatar,
       totalScore:  p.totalScore,
       isHost:      p.socketId === this.hostId,
     }));
   }
 }
 
+const VALID_AVATARS = new Set([
+  'felix','aneka','oliver','orion','luna','nova','atlas','echo',
+  'rio','max','sage','rebel','ace','flash','neo','storm',
+  'raven','blaze','zen','kit','wolf','fox','crow','jay',
+]);
+
 function sanitizeName(name) {
   if (typeof name !== 'string') return null;
   const s = name.replace(/[<>&"']/g, '').trim();
   if (s.length < 1 || s.length > 20) return null;
   return s;
+}
+
+function sanitizeAvatar(seed) {
+  if (typeof seed === 'string' && VALID_AVATARS.has(seed)) return seed;
+  return 'felix';
 }
 
 function checkAllGuessed(io, room) {
@@ -115,6 +127,7 @@ function endRound(io, room) {
     results.push({
       socketId:    player.socketId,
       displayName: player.displayName,
+      avatar:      player.avatar,
       roundScore,
       totalScore:  player.totalScore,
     });
@@ -166,9 +179,11 @@ function attachCompetition(io, sessionMiddleware) {
       rooms.set(code, room);
       socketToRoom.set(socket.id, code);
 
+      const avatar = sanitizeAvatar(payload?.avatar);
       room.players.set(socket.id, {
         socketId:    socket.id,
         displayName,
+        avatar,
         userId:      user?.id ?? null,
         scores:      [],
         totalScore:  0,
@@ -187,10 +202,12 @@ function attachCompetition(io, sessionMiddleware) {
       if (!room)                    return socket.emit('room:error', { message: 'Room not found' });
       if (room.state !== 'waiting') return socket.emit('room:error', { message: 'Game already in progress' });
 
+      const avatar = sanitizeAvatar(payload?.avatar);
       socketToRoom.set(socket.id, room.code);
       room.players.set(socket.id, {
         socketId:    socket.id,
         displayName,
+        avatar,
         userId:      user?.id ?? null,
         scores:      [],
         totalScore:  0,

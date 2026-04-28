@@ -3,6 +3,16 @@
 // ── Helpers ────────────────────────────────────────────────
 function qs(sel) { return document.querySelector(sel); }
 
+// ── Avatars ────────────────────────────────────────────────
+const AVATAR_SEEDS = [
+  'felix','aneka','oliver','orion','luna','nova','atlas','echo',
+  'rio','max','sage','rebel','ace','flash','neo','storm',
+  'raven','blaze','zen','kit','wolf','fox','crow','jay',
+];
+function avatarUrl(seed) {
+  return `https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(seed)}&size=64`;
+}
+
 // ── State ──────────────────────────────────────────────────
 const state = {
   socket:         null,
@@ -10,6 +20,7 @@ const state = {
   isHost:         false,
   mySocketId:     null,
   displayName:    null,
+  avatar:         AVATAR_SEEDS[0],
   round:          -1,
   totalScore:     0,
   roundActive:    false,
@@ -168,7 +179,8 @@ function renderPlayerList(players) {
     const li = document.createElement('li');
     li.classList.toggle('is-host', p.isHost);
     li.classList.toggle('is-you', p.socketId === state.mySocketId);
-    let html = p.displayName;
+    const avatarImg = p.avatar ? `<img class="player-avatar" src="${avatarUrl(p.avatar)}" alt="" />` : '';
+    let html = avatarImg + escapeHtml(p.displayName);
     if (p.isHost) html += ' <span class="player-host-badge">Host</span>';
     if (p.socketId === state.mySocketId) html += ' <span style="font-size:9px;color:var(--teal)">(you)</span>';
     li.innerHTML = html;
@@ -285,9 +297,10 @@ function showRoundResults(data) {
     tr.classList.toggle('is-me', r.socketId === state.mySocketId);
     const rs = r.roundScore;
     const noGuess = rs.noGuess;
+    const av = r.avatar ? `<img class="result-avatar" src="${avatarUrl(r.avatar)}" alt="" />` : '';
     tr.innerHTML = `
       <td>${i + 1}</td>
-      <td>${escapeHtml(r.displayName)}</td>
+      <td>${av}${escapeHtml(r.displayName)}</td>
       <td class="${noGuess ? 'no-guess' : ''}">${noGuess ? '—' : rs.accuracyScore}</td>
       <td class="${noGuess ? 'no-guess' : ''}">${noGuess ? '—' : '+' + rs.speedBonus}</td>
       <td class="${noGuess ? 'no-guess' : ''}">${noGuess ? 'No guess' : rs.total}</td>
@@ -319,8 +332,10 @@ function showFinalStandings(data) {
     else if (i === 2) div.classList.add('rank-3');
     if (p.socketId === state.mySocketId) div.classList.add('is-me');
     const medals = ['🥇', '🥈', '🥉'];
+    const av = p.avatar ? `<img class="podium-avatar" src="${avatarUrl(p.avatar)}" alt="" />` : '';
     div.innerHTML = `
       <div class="podium-rank">${medals[i] || i + 1}</div>
+      ${av}
       <div class="podium-name">${escapeHtml(p.displayName)}${p.socketId === state.mySocketId ? ' <span style="font-size:9px;color:var(--teal)">(you)</span>' : ''}</div>
       <div class="podium-score">${p.totalScore}</div>
     `;
@@ -466,18 +481,52 @@ function handleCreateOrJoin(isJoin) {
     const code = qs('#code-input').value.trim().toUpperCase();
     if (code.length !== 6) { setLobbyError('Enter a 6-character room code'); return; }
     state.displayName = name;
-    state.socket.emit('room:join', { code, displayName: name });
+    state.socket.emit('room:join', { code, displayName: name, avatar: state.avatar });
   } else {
     const roomName = qs('#room-name-input').value.trim();
     state.displayName = name;
-    state.socket.emit('room:create', { displayName: name, roomName: roomName || null });
+    state.socket.emit('room:create', { displayName: name, roomName: roomName || null, avatar: state.avatar });
   }
+}
+
+// ── Avatar picker ───────────────────────────────────────────
+function initAvatarPicker() {
+  const picker = qs('#avatar-picker');
+  AVATAR_SEEDS.forEach((seed, i) => {
+    const div = document.createElement('div');
+    div.className = 'avatar-option' + (i === 0 ? ' selected' : '');
+    div.dataset.seed = seed;
+    div.innerHTML = `<img src="${avatarUrl(seed)}" alt="${seed}" loading="lazy" />`;
+    div.addEventListener('click', () => {
+      qs('.avatar-option.selected')?.classList.remove('selected');
+      div.classList.add('selected');
+      state.avatar = seed;
+    });
+    picker.appendChild(div);
+  });
+}
+
+// Pre-fill name from logged-in session
+async function prefillName() {
+  try {
+    const res = await fetch('/api/auth/me', { credentials: 'include' });
+    if (!res.ok) return;
+    const user = await res.json();
+    if (user?.username) {
+      const input = qs('#name-input');
+      input.value = user.username;
+      input.setAttribute('readonly', '');
+      input.style.opacity = '0.6';
+    }
+  } catch (_) {}
 }
 
 // ── Init ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initGlobe();
   initSocket();
+  initAvatarPicker();
+  prefillName();
 
   qs('#create-btn').addEventListener('click', () => {
     if (_joinMode) return;
