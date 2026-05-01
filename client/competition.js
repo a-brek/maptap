@@ -517,9 +517,13 @@ function initSocket() {
 
   socket.on('room:error', ({ message }) => {
     if (state._silentReconnectUntil && Date.now() < state._silentReconnectUntil) {
-      // Speculative reconnect failed (e.g. room was reaped); fall back to the
-      // join form silently so the user can re-enter the code.
+      // Speculative reconnect failed (room was reaped or game already over).
+      // Drop the stale ?code= from the URL and reset to create-mode so the
+      // user isn't stuck trying to rejoin a dead room.
       state._silentReconnectUntil = null;
+      history.replaceState(null, '', '/compete');
+      switchToCreateMode();
+      qs('#code-input').value = '';
       return;
     }
     setLobbyError(message);
@@ -580,6 +584,15 @@ function switchToJoinMode() {
   qs('#create-btn').style.display = 'none';
   qs('#join-toggle-btn').textContent = 'Join';
   qs('#join-toggle-btn').classList.add('primary');
+}
+
+function switchToCreateMode() {
+  _joinMode = false;
+  qs('#code-field').style.display = 'none';
+  qs('#room-name-field').style.display = '';
+  qs('#create-btn').style.display = '';
+  qs('#join-toggle-btn').textContent = 'Join Room';
+  qs('#join-toggle-btn').classList.remove('primary');
 }
 
 function handleCreateOrJoin(isJoin) {

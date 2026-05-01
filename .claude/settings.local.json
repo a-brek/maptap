@@ -5,7 +5,8 @@
       "Bash(node -e \"require\\('./server/index'\\)\")",
       "Bash(curl -s http://localhost:3001/compete)",
       "Bash(rtk git *)",
-      "Bash(rtk git commit -m 'fix lobby title/subtitle overlap on mobile *)"
+      "Bash(rtk git commit -m 'fix lobby title/subtitle overlap on mobile *)",
+      "Bash(node -c client/competition.js)"
     ]
   }
 }
