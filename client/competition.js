@@ -27,26 +27,43 @@ function avatarUrl(avatar) {
   return `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}&size=64`;
 }
 
+// ── Player identity (survives reload / disconnect) ─────────
+function getOrCreatePlayerId() {
+  try {
+    let id = localStorage.getItem('maptap_player_id');
+    if (!id) {
+      id = 'p_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      localStorage.setItem('maptap_player_id', id);
+    }
+    return id;
+  } catch (_) {
+    return 'p_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+  }
+}
+
 // ── State ──────────────────────────────────────────────────
 const state = {
-  socket:         null,
-  roomCode:       null,
-  isHost:         false,
-  mySocketId:     null,
-  displayName:    null,
-  avatar:         AVATARS[0],
-  round:          -1,
-  totalScore:     0,
-  roundActive:    false,
-  guessSubmitted: false,
-  pendingGuess:   null,
-  roundEndAt:     null,
-  timerInterval:  null,
-  markers:        [],
-  arcs:           [],
-  rings:          [],
-  labels:         [],
-  currentWorld:   'earth',
+  socket:           null,
+  roomCode:         null,
+  playerId:         getOrCreatePlayerId(),
+  isHost:           false,
+  mySocketId:       null,
+  displayName:      null,
+  avatar:           AVATARS[0],
+  round:            -1,
+  totalScore:       0,
+  roundActive:      false,
+  guessSubmitted:   false,
+  pendingGuess:     null,
+  roundEndAt:       null,
+  timerInterval:    null,
+  nextRoundAt:      null,
+  nextRoundInterval:null,
+  markers:          [],
+  arcs:             [],
+  rings:            [],
+  labels:           [],
+  currentWorld:     'earth',
 };
 
 let globe = null;
@@ -183,6 +200,27 @@ function startCountdown() {
 function stopCountdown() {
   clearInterval(state.timerInterval);
   state.timerInterval = null;
+}
+
+function startNextRoundCountdown(ms) {
+  clearInterval(state.nextRoundInterval);
+  state.nextRoundAt = Date.now() + ms;
+  const label = qs('#results-next-label');
+  const tick = () => {
+    const secs = Math.max(0, Math.ceil((state.nextRoundAt - Date.now()) / 1000));
+    if (label) label.textContent = `Next round in ${secs}s…`;
+    if (secs <= 0) {
+      clearInterval(state.nextRoundInterval);
+      state.nextRoundInterval = null;
+    }
+  };
+  tick();
+  state.nextRoundInterval = setInterval(tick, 250);
+}
+
+function stopNextRoundCountdown() {
+  clearInterval(state.nextRoundInterval);
+  state.nextRoundInterval = null;
 }
 
 // ── Lobby UI ────────────────────────────────────────────────
@@ -412,6 +450,22 @@ function initSocket() {
     if (preCode) {
       qs('#code-input').value = preCode.toUpperCase();
       switchToJoinMode();
+
+      // Silent reconnect attempt: if we already had a player slot in this
+      // room (phone went to sleep, network blipped, etc.) the server will
+      // recognise our playerId and reattach us to the existing game.
+      const lastName = (() => {
+        try { return localStorage.getItem('maptap_display_name') || ''; } catch (_) { return ''; }
+      })();
+      if (state.playerId && lastName) {
+        state._silentReconnectUntil = Date.now() + 2000;
+        state.socket.emit('room:join', {
+          code:        preCode.toUpperCase(),
+          displayName: lastName,
+          avatar:      state.avatar,
+          playerId:    state.playerId,
+        });
+      }
     }
   });
 
@@ -419,18 +473,55 @@ function initSocket() {
     qs('#loading').removeAttribute('hidden');
   });
 
-  socket.on('room:created', ({ code, players, isHost, roomName }) => {
+  socket.on('room:created', ({ code, playerId, players, isHost, roomName }) => {
+    if (playerId) state.playerId = playerId;
     showLobbyWaiting(code, players, isHost, roomName);
     history.replaceState(null, '', `/compete?code=${code}`);
   });
 
-  socket.on('room:joined', ({ code, players, isHost, roomName }) => {
+  socket.on('room:joined', ({ code, playerId, players, isHost, roomName, gameState }) => {
+    if (playerId) state.playerId = playerId;
     state.mySocketId = socket.id;
-    showLobbyWaiting(code, players, isHost, roomName);
+    state.roomCode   = code;
+    state.isHost     = isHost;
     history.replaceState(null, '', `/compete?code=${code}`);
+
+    if (gameState && gameState.phase === 'round') {
+      // Reconnecting into an in-progress round
+      showGameUI();
+      qs('#starting-overlay').setAttribute('hidden', '');
+      state.totalScore = gameState.totalScore || 0;
+      qs('#score-display').textContent = state.totalScore;
+      startRoundUI({
+        round:    gameState.round,
+        total:    gameState.total,
+        cityName: gameState.cityName,
+        world:    gameState.world,
+        tier:     gameState.tier,
+        duration: gameState.timeLeftMs,
+      });
+      if (gameState.alreadyGuessed) {
+        state.guessSubmitted = true;
+        const btn = qs('#confirm-btn');
+        btn.textContent = 'Guess submitted!';
+        btn.setAttribute('disabled', '');
+        btn.style.opacity = '0.6';
+        btn.removeAttribute('hidden');
+      }
+    } else if (gameState && gameState.phase === 'finished') {
+      showLobbyWaiting(code, players, isHost, roomName);
+    } else {
+      showLobbyWaiting(code, players, isHost, roomName);
+    }
   });
 
   socket.on('room:error', ({ message }) => {
+    if (state._silentReconnectUntil && Date.now() < state._silentReconnectUntil) {
+      // Speculative reconnect failed (e.g. room was reaped); fall back to the
+      // join form silently so the user can re-enter the code.
+      state._silentReconnectUntil = null;
+      return;
+    }
     setLobbyError(message);
     qs('#lobby-error-waiting').textContent = message || '';
   });
@@ -457,6 +548,7 @@ function initSocket() {
 
   socket.on('game:round-start', (data) => {
     qs('#round-results').setAttribute('hidden', '');
+    stopNextRoundCountdown();
     startRoundUI(data);
   });
 
@@ -470,6 +562,7 @@ function initSocket() {
 
   socket.on('game:round-end', (data) => {
     showRoundResults(data);
+    startNextRoundCountdown(data.nextInMs ?? 5000);
   });
 
   socket.on('game:finished', (data) => {
@@ -495,15 +588,17 @@ function handleCreateOrJoin(isJoin) {
   if (name.length > 20) { setLobbyError('Name too long (max 20 chars)'); return; }
   setLobbyError('');
 
+  try { localStorage.setItem('maptap_display_name', name); } catch (_) {}
+
   if (isJoin) {
     const code = qs('#code-input').value.trim().toUpperCase();
     if (code.length !== 6) { setLobbyError('Enter a 6-character room code'); return; }
     state.displayName = name;
-    state.socket.emit('room:join', { code, displayName: name, avatar: state.avatar });
+    state.socket.emit('room:join', { code, displayName: name, avatar: state.avatar, playerId: state.playerId });
   } else {
     const roomName = qs('#room-name-input').value.trim();
     state.displayName = name;
-    state.socket.emit('room:create', { displayName: name, roomName: roomName || null, avatar: state.avatar });
+    state.socket.emit('room:create', { displayName: name, roomName: roomName || null, avatar: state.avatar, playerId: state.playerId });
   }
 }
 

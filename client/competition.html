@@ -237,25 +237,36 @@
     /* ── Round results panel ── */
     #round-results {
       position: fixed;
-      inset: 0;
-      background: rgba(10, 13, 20, 0.92);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      top: 50%;
+      right: 20px;
+      transform: translateY(-50%);
       z-index: 120;
+      pointer-events: none;
     }
     #round-results[hidden] { display: none; }
 
     .results-card {
-      width: min(500px, calc(100vw - 32px));
-      background: var(--bg-panel, #0e1420);
+      width: min(420px, calc(100vw - 32px));
+      background: rgba(14, 20, 32, 0.92);
+      backdrop-filter: blur(10px);
       border: 1px solid var(--border-hi);
-      padding: 24px 20px;
+      padding: 20px 18px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
-      max-height: 80vh;
+      gap: 12px;
+      max-height: 86vh;
       overflow-y: auto;
+      pointer-events: auto;
+    }
+    @media (max-width: 600px) {
+      #round-results {
+        top: auto;
+        bottom: 12px;
+        right: 12px;
+        left: 12px;
+        transform: none;
+      }
+      .results-card { width: auto; max-height: 60vh; }
     }
     .results-header {
       font-family: var(--font-display);

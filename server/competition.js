@@ -5,10 +5,11 @@ const { getLocationsForDate, haversine, calcScore, WORLD_PARAMS } = require('./r
 const rooms       = new Map(); // code → Room
 const socketToRoom = new Map(); // socketId → code
 
-const ROUND_DURATION_MS = 10_000;
-const REVEAL_PAUSE_MS   = 5_000;
-const ROOM_TTL_MS       = 10 * 60 * 1000;
-const CODE_CHARS        = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const ROUND_DURATION_MS    = 10_000;
+const REVEAL_PAUSE_MS      = 5_000;
+const ROOM_TTL_MS          = 10 * 60 * 1000;
+const RECONNECT_GRACE_MS   = 90_000;
+const CODE_CHARS           = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 function generateCode() {
   let code;
@@ -21,6 +22,14 @@ function generateCode() {
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function randomSeed() {
+  return `comp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function newPlayerId() {
+  return `p_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
 }
 
 class Room {
@@ -45,6 +54,7 @@ class Room {
       avatar:      p.avatar,
       totalScore:  p.totalScore,
       isHost:      p.socketId === this.hostId,
+      disconnected: !!p.disconnected,
     }));
   }
 }
@@ -77,7 +87,9 @@ function sanitizeAvatar(avatar) {
 }
 
 function checkAllGuessed(io, room) {
-  const allGuessed = [...room.players.keys()].every(id => room.roundGuesses.has(id));
+  const active = [...room.players.values()].filter(p => !p.disconnected);
+  if (active.length === 0) return;
+  const allGuessed = active.every(p => room.roundGuesses.has(p.socketId));
   if (allGuessed) endRound(io, room);
 }
 
@@ -145,9 +157,10 @@ function endRound(io, room) {
   results.sort((a, b) => b.totalScore - a.totalScore);
 
   io.to(room.code).emit('game:round-end', {
-    round:   room.round,
-    actual:  { lat: loc.lat, lng: loc.lng, name: loc.name, world },
+    round:    room.round,
+    actual:   { lat: loc.lat, lng: loc.lng, name: loc.name, world },
     results,
+    nextInMs: REVEAL_PAUSE_MS,
   });
 
   if (room.round >= room.locations.length - 1) {
@@ -159,6 +172,14 @@ function endRound(io, room) {
   } else {
     setTimeout(() => startRound(io, room, room.round + 1), REVEAL_PAUSE_MS);
   }
+}
+
+function findPlayerByPlayerId(room, playerId) {
+  if (!playerId) return null;
+  for (const p of room.players.values()) {
+    if (p.playerId === playerId) return p;
+  }
+  return null;
 }
 
 function attachCompetition(io, sessionMiddleware) {
@@ -189,17 +210,22 @@ function attachCompetition(io, sessionMiddleware) {
       socketToRoom.set(socket.id, code);
 
       const avatar = sanitizeAvatar(payload?.avatar);
+      const playerId = (typeof payload?.playerId === 'string' && payload.playerId.length <= 64)
+        ? payload.playerId
+        : newPlayerId();
       room.players.set(socket.id, {
         socketId:    socket.id,
+        playerId,
         displayName,
         avatar,
         userId:      user?.id ?? null,
         scores:      [],
         totalScore:  0,
+        disconnected: false,
       });
 
       socket.join(code);
-      socket.emit('room:created', { code, players: room.playerList(), isHost: true, roomName: room.roomName });
+      socket.emit('room:created', { code, playerId, players: room.playerList(), isHost: true, roomName: room.roomName });
     });
 
     socket.on('room:join', (payload) => {
@@ -208,22 +234,77 @@ function attachCompetition(io, sessionMiddleware) {
       if (!displayName) return socket.emit('room:error', { message: 'Invalid display name (1–20 chars)' });
 
       const room = rooms.get(String(code).toUpperCase());
-      if (!room)                    return socket.emit('room:error', { message: 'Room not found' });
+      if (!room) return socket.emit('room:error', { message: 'Room not found' });
+
+      // Reconnect path: existing player slot found via playerId
+      const existing = findPlayerByPlayerId(room, payload?.playerId);
+      if (existing) {
+        if (existing.disconnected && existing.reconnectTimer) {
+          clearTimeout(existing.reconnectTimer);
+          existing.reconnectTimer = null;
+        }
+        // Move slot to new socket id
+        room.players.delete(existing.socketId);
+        if (room.hostId === existing.socketId) room.hostId = socket.id;
+        existing.socketId    = socket.id;
+        existing.disconnected = false;
+        room.players.set(socket.id, existing);
+        socketToRoom.set(socket.id, room.code);
+        socket.join(room.code);
+
+        const payloadOut = {
+          code:        room.code,
+          playerId:    existing.playerId,
+          players:     room.playerList(),
+          isHost:      room.hostId === socket.id,
+          roomName:    room.roomName,
+          reconnected: true,
+        };
+
+        if (room.state === 'in-progress' && room.locations) {
+          const loc = room.locations[room.round];
+          payloadOut.gameState = {
+            phase:        'round',
+            round:        room.round,
+            total:        room.locations.length,
+            cityName:     loc.name,
+            world:        loc.world || 'earth',
+            tier:         loc.tier,
+            timeLeftMs:   Math.max(0, ROUND_DURATION_MS - (Date.now() - room.roundStart)),
+            alreadyGuessed: room.roundGuesses.has(socket.id),
+            totalScore:   existing.totalScore,
+          };
+        } else if (room.state === 'finished') {
+          payloadOut.gameState = { phase: 'finished' };
+        }
+
+        socket.emit('room:joined', payloadOut);
+        socket.to(room.code).emit('room:players-updated', { players: room.playerList() });
+        // If they were the missing guess, round may now be ready to end
+        if (room.state === 'in-progress') checkAllGuessed(io, room);
+        return;
+      }
+
       if (room.state !== 'waiting') return socket.emit('room:error', { message: 'Game already in progress' });
 
       const avatar = sanitizeAvatar(payload?.avatar);
+      const playerId = (typeof payload?.playerId === 'string' && payload.playerId.length <= 64)
+        ? payload.playerId
+        : newPlayerId();
       socketToRoom.set(socket.id, room.code);
       room.players.set(socket.id, {
         socketId:    socket.id,
+        playerId,
         displayName,
         avatar,
         userId:      user?.id ?? null,
         scores:      [],
         totalScore:  0,
+        disconnected: false,
       });
 
       socket.join(room.code);
-      socket.emit('room:joined', { code: room.code, players: room.playerList(), isHost: false, roomName: room.roomName });
+      socket.emit('room:joined', { code: room.code, playerId, players: room.playerList(), isHost: false, roomName: room.roomName });
       socket.to(room.code).emit('room:players-updated', { players: room.playerList() });
     });
 
@@ -237,7 +318,8 @@ function attachCompetition(io, sessionMiddleware) {
 
       room.state     = 'in-progress';
       room.date      = todayStr();
-      room.locations = getLocationsForDate(room.date);
+      // Random per-room seed so competition locations differ from the daily puzzle
+      room.locations = getLocationsForDate(randomSeed());
 
       io.to(room.code).emit('game:starting', { rounds: room.locations.length });
       setTimeout(() => startRound(io, room, 0), 3000);
@@ -271,25 +353,49 @@ function attachCompetition(io, sessionMiddleware) {
       if (!room) return;
 
       const player = room.players.get(socket.id);
-      room.players.delete(socket.id);
+      if (!player) return;
 
-      if (room.players.size === 0) {
-        clearTimeout(room.roundTimer);
-        rooms.delete(code);
+      // In waiting lobby: remove immediately (no game state to preserve)
+      if (room.state === 'waiting') {
+        room.players.delete(socket.id);
+        if (room.players.size === 0) {
+          clearTimeout(room.roundTimer);
+          rooms.delete(code);
+          return;
+        }
+        if (room.hostId === socket.id) {
+          room.hostId = room.players.keys().next().value;
+          io.to(code).emit('room:host-changed', { newHostId: room.hostId });
+        }
+        io.to(code).emit('room:players-updated', { players: room.playerList() });
         return;
       }
 
-      if (room.hostId === socket.id) {
-        room.hostId = room.players.keys().next().value;
-        io.to(code).emit('room:host-changed', { newHostId: room.hostId });
-      }
+      // Mid-game / finished: keep slot for grace window so they can reconnect
+      player.disconnected = true;
+      io.to(code).emit('room:player-left', { displayName: player.displayName });
 
-      if (room.state === 'waiting') {
+      // If their absence means everyone else has guessed, round can end
+      if (room.state === 'in-progress') checkAllGuessed(io, room);
+
+      player.reconnectTimer = setTimeout(() => {
+        const stillThere = room.players.get(player.socketId);
+        if (!stillThere || !stillThere.disconnected) return;
+        room.players.delete(player.socketId);
+
+        if (room.players.size === 0) {
+          clearTimeout(room.roundTimer);
+          rooms.delete(code);
+          return;
+        }
+        if (room.hostId === player.socketId) {
+          // Pick any non-disconnected player, or fall back to first
+          const next = [...room.players.values()].find(p => !p.disconnected) || room.players.values().next().value;
+          room.hostId = next.socketId;
+          io.to(code).emit('room:host-changed', { newHostId: room.hostId });
+        }
         io.to(code).emit('room:players-updated', { players: room.playerList() });
-      } else {
-        io.to(code).emit('room:player-left', { displayName: player?.displayName });
-        if (room.state === 'in-progress') checkAllGuessed(io, room);
-      }
+      }, RECONNECT_GRACE_MS);
     });
   });
 }
