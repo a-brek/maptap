@@ -248,7 +248,9 @@ function startRoundUI(data) {
   setGlobeWorld(world);
 
   // Update clue panel
-  qs('#clue-panel').removeAttribute('hidden');
+  const cluePanel = qs('#clue-panel');
+  cluePanel.removeAttribute('hidden');
+  cluePanel.classList.add('visible');
   qs('#round-number').textContent = String(round + 1).padStart(2, '0');
   qs('#round-label').textContent = `Round ${round + 1} of ${total}`;
   qs('#round-display').textContent = `${round + 1} / ${total}`;
@@ -325,6 +327,7 @@ function showRoundResults(data) {
 
   qs('#results-round-title').textContent = `Round ${round + 1} Results`;
   qs('#results-location-name').textContent = data.actual.name;
+  qs('#clue-panel').classList.remove('visible');
   qs('#clue-panel').setAttribute('hidden', '');
   qs('#round-results').removeAttribute('hidden');
 }
@@ -332,6 +335,7 @@ function showRoundResults(data) {
 function showFinalStandings(data) {
   qs('#round-results').setAttribute('hidden', '');
   qs('#hud').setAttribute('hidden', '');
+  qs('#clue-panel').classList.remove('visible');
   qs('#clue-panel').setAttribute('hidden', '');
 
   const { finalStandings } = data;
