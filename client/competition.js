@@ -581,7 +581,8 @@ function switchToJoinMode() {
   _joinMode = true;
   qs('#code-field').style.display = '';
   qs('#room-name-field').style.display = 'none';
-  qs('#create-btn').style.display = 'none';
+  qs('#create-btn').textContent = '← Back';
+  qs('#create-btn').classList.remove('primary');
   qs('#join-toggle-btn').textContent = 'Join';
   qs('#join-toggle-btn').classList.add('primary');
 }
@@ -590,7 +591,8 @@ function switchToCreateMode() {
   _joinMode = false;
   qs('#code-field').style.display = 'none';
   qs('#room-name-field').style.display = '';
-  qs('#create-btn').style.display = '';
+  qs('#create-btn').textContent = 'Create Room';
+  qs('#create-btn').classList.add('primary');
   qs('#join-toggle-btn').textContent = 'Join Room';
   qs('#join-toggle-btn').classList.remove('primary');
 }
@@ -654,7 +656,12 @@ document.addEventListener('DOMContentLoaded', () => {
   prefillName();
 
   qs('#create-btn').addEventListener('click', () => {
-    if (_joinMode) return;
+    if (_joinMode) {
+      switchToCreateMode();
+      qs('#code-input').value = '';
+      setLobbyError('');
+      return;
+    }
     handleCreateOrJoin(false);
   });
 
