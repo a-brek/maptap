@@ -255,6 +255,47 @@ function showLobbyWaiting(code, players, isHost, roomName) {
   } else {
     startBtn.setAttribute('hidden', '');
   }
+  if (navigator.share) qs('#share-link-btn').removeAttribute('hidden');
+}
+
+function inviteUrl() {
+  return `${window.location.origin}/compete?code=${state.roomCode}`;
+}
+
+async function copyInviteLink() {
+  const url = inviteUrl();
+  try {
+    await navigator.clipboard.writeText(url);
+  } catch (_) {
+    // Fallback for older browsers / insecure contexts
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (_) {}
+    document.body.removeChild(ta);
+  }
+  const btn = qs('#copy-link-btn');
+  const orig = btn.textContent;
+  btn.textContent = 'Link copied!';
+  btn.classList.add('copied');
+  setTimeout(() => {
+    btn.textContent = orig;
+    btn.classList.remove('copied');
+  }, 1800);
+}
+
+async function shareInviteLink() {
+  if (!navigator.share) return copyInviteLink();
+  try {
+    await navigator.share({
+      title: 'Tap Map Live',
+      text:  `Join my Tap Map room — code ${state.roomCode}`,
+      url:   inviteUrl(),
+    });
+  } catch (_) { /* user cancelled */ }
 }
 
 function setLobbyError(msg) {
@@ -678,6 +719,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   qs('#confirm-btn').addEventListener('click', confirmGuess);
+
+  qs('#copy-link-btn').addEventListener('click', copyInviteLink);
+  qs('#share-link-btn').addEventListener('click', shareInviteLink);
 
   // Enter key in name / code inputs
   qs('#name-input').addEventListener('keydown', e => {

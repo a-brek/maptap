@@ -142,6 +142,17 @@
       color: var(--text-dim);
       text-align: center;
     }
+    .invite-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .invite-actions .lobby-btn { padding: 8px 12px; font-size: 10px; }
+    .invite-actions .lobby-btn.copied {
+      background: rgba(0,201,167,0.18);
+      color: var(--teal);
+      border-color: var(--teal);
+    }
 
     .player-list {
       list-style: none;
@@ -601,7 +612,11 @@
         <div>
           <div id="room-name-display" style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--amber);text-align:center;min-height:16px;"></div>
           <div class="room-code-display" id="room-code-display"></div>
-          <div class="room-code-hint">Share this code to invite players</div>
+          <div class="room-code-hint">Share this code or link to invite players</div>
+          <div class="invite-actions">
+            <button id="copy-link-btn" type="button" class="lobby-btn">Copy invite link</button>
+            <button id="share-link-btn" type="button" class="lobby-btn" hidden>Share</button>
+          </div>
         </div>
 
         <ul class="player-list" id="player-list"></ul>
