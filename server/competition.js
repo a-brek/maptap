@@ -355,28 +355,17 @@ function attachCompetition(io, sessionMiddleware) {
       const player = room.players.get(socket.id);
       if (!player) return;
 
-      // In waiting lobby: remove immediately (no game state to preserve)
-      if (room.state === 'waiting') {
-        room.players.delete(socket.id);
-        if (room.players.size === 0) {
-          clearTimeout(room.roundTimer);
-          rooms.delete(code);
-          return;
-        }
-        if (room.hostId === socket.id) {
-          room.hostId = room.players.keys().next().value;
-          io.to(code).emit('room:host-changed', { newHostId: room.hostId });
-        }
-        io.to(code).emit('room:players-updated', { players: room.playerList() });
-        return;
-      }
-
-      // Mid-game / finished: keep slot for grace window so they can reconnect
+      // Keep slot for a grace window so reloads / mobile backgrounding /
+      // network blips don't nuke the room. Reconnect via playerId restores
+      // the player into the same slot.
       player.disconnected = true;
-      io.to(code).emit('room:player-left', { displayName: player.displayName });
 
-      // If their absence means everyone else has guessed, round can end
-      if (room.state === 'in-progress') checkAllGuessed(io, room);
+      if (room.state === 'waiting') {
+        io.to(code).emit('room:players-updated', { players: room.playerList() });
+      } else {
+        io.to(code).emit('room:player-left', { displayName: player.displayName });
+        if (room.state === 'in-progress') checkAllGuessed(io, room);
+      }
 
       player.reconnectTimer = setTimeout(() => {
         const stillThere = room.players.get(player.socketId);
