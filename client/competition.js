@@ -3,6 +3,12 @@
 // ── Helpers ────────────────────────────────────────────────
 function qs(sel) { return document.querySelector(sel); }
 
+function vibrate(pattern) {
+  if (navigator.vibrate) {
+    try { navigator.vibrate(pattern); } catch (_) {}
+  }
+}
+
 // ── Avatars ────────────────────────────────────────────────
 const AVATAR_SEEDS = [
   'felix','aneka','oliver','orion','luna','nova','atlas','echo',
@@ -186,6 +192,7 @@ function confirmGuess() {
 // ── Timer ──────────────────────────────────────────────────
 function startCountdown() {
   clearInterval(state.timerInterval);
+  state._lastBuzzedSec = null;
   state.timerInterval = setInterval(() => {
     if (!state.roundEndAt) return;
     const secsLeft = Math.max(0, Math.ceil((state.roundEndAt - Date.now()) / 1000));
@@ -193,6 +200,11 @@ function startCountdown() {
     if (el) {
       el.textContent = secsLeft;
       el.classList.toggle('urgent', secsLeft <= 3);
+    }
+    // Buzz once per second on the last 3 seconds (skip if already guessed)
+    if (!state.guessSubmitted && secsLeft <= 3 && secsLeft > 0 && secsLeft !== state._lastBuzzedSec) {
+      state._lastBuzzedSec = secsLeft;
+      vibrate(secsLeft === 1 ? [80, 40, 80] : 60);
     }
   }, 100);
 }
@@ -231,14 +243,45 @@ function renderPlayerList(players) {
     const li = document.createElement('li');
     li.classList.toggle('is-host', p.isHost);
     li.classList.toggle('is-you', p.socketId === state.mySocketId);
+    li.classList.toggle('is-disconnected', !!p.disconnected);
     const avatarImg = p.avatar ? `<img class="player-avatar" src="${avatarUrl(p.avatar)}" alt="" />` : '';
     let html = avatarImg + escapeHtml(p.displayName);
     if (p.isHost) html += ' <span class="player-host-badge">Host</span>';
     if (p.socketId === state.mySocketId) html += ' <span style="font-size:9px;color:var(--teal)">(you)</span>';
+    if (p.disconnected) {
+      html += ' <span class="player-ready-pill notready">Offline</span>';
+    } else if (p.ready) {
+      html += ' <span class="player-ready-pill ready">Ready</span>';
+    } else {
+      html += ' <span class="player-ready-pill notready">Not ready</span>';
+    }
     li.innerHTML = html;
     ul.appendChild(li);
   }
-  qs('#waiting-status').textContent = `${players.length} player${players.length !== 1 ? 's' : ''} in lobby`;
+
+  const active = players.filter(p => !p.disconnected);
+  const readyCount = active.filter(p => p.ready).length;
+  const allReady = active.length > 0 && readyCount === active.length;
+
+  qs('#waiting-status').textContent =
+    `${readyCount}/${active.length} ready · ${players.length} in lobby`;
+
+  // Reflect my own ready state on the toggle
+  const me = players.find(p => p.socketId === state.mySocketId);
+  state.iAmReady = !!(me && me.ready);
+  const readyBtn = qs('#ready-btn');
+  if (readyBtn) {
+    readyBtn.textContent = state.iAmReady ? 'Cancel Ready' : "I'm Ready";
+    readyBtn.classList.toggle('primary', !state.iAmReady);
+  }
+
+  // Host can only start when everyone (active) is ready
+  const startBtn = qs('#start-btn');
+  if (startBtn && state.isHost) {
+    if (allReady) startBtn.removeAttribute('disabled');
+    else          startBtn.setAttribute('disabled', '');
+    startBtn.textContent = allReady ? 'Start Game' : `Waiting (${readyCount}/${active.length})`;
+  }
 }
 
 function showLobbyWaiting(code, players, isHost, roomName) {
@@ -460,13 +503,16 @@ function showStartingCountdown(totalMs) {
   const secsTotal = Math.ceil(totalMs / 1000);
   let s = secsTotal;
   cd.textContent = s;
+  vibrate(40);
   const iv = setInterval(() => {
     s--;
     if (s <= 0) {
       clearInterval(iv);
       overlay.setAttribute('hidden', '');
+      vibrate([60, 40, 120]);
     } else {
       cd.textContent = s;
+      vibrate(40);
     }
   }, 1000);
 }
@@ -716,6 +762,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   qs('#start-btn').addEventListener('click', () => {
     state.socket.emit('host:start');
+  });
+
+  qs('#ready-btn').addEventListener('click', () => {
+    state.iAmReady = !state.iAmReady;
+    state.socket.emit('player:ready', { ready: state.iAmReady });
+    vibrate(20);
   });
 
   qs('#confirm-btn').addEventListener('click', confirmGuess);

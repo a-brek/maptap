@@ -55,6 +55,7 @@ class Room {
       totalScore:  p.totalScore,
       isHost:      p.socketId === this.hostId,
       disconnected: !!p.disconnected,
+      ready:       !!p.ready,
     }));
   }
 }
@@ -222,6 +223,7 @@ function attachCompetition(io, sessionMiddleware) {
         scores:      [],
         totalScore:  0,
         disconnected: false,
+        ready:       false,
       });
 
       socket.join(code);
@@ -301,11 +303,22 @@ function attachCompetition(io, sessionMiddleware) {
         scores:      [],
         totalScore:  0,
         disconnected: false,
+        ready:       false,
       });
 
       socket.join(room.code);
       socket.emit('room:joined', { code: room.code, playerId, players: room.playerList(), isHost: false, roomName: room.roomName });
       socket.to(room.code).emit('room:players-updated', { players: room.playerList() });
+    });
+
+    socket.on('player:ready', (payload) => {
+      const code = socketToRoom.get(socket.id);
+      const room = code && rooms.get(code);
+      if (!room || room.state !== 'waiting') return;
+      const player = room.players.get(socket.id);
+      if (!player) return;
+      player.ready = !!(payload && payload.ready);
+      io.to(room.code).emit('room:players-updated', { players: room.playerList() });
     });
 
     socket.on('host:start', () => {
@@ -315,6 +328,12 @@ function attachCompetition(io, sessionMiddleware) {
       if (room.hostId !== socket.id)    return;
       if (room.state !== 'waiting')     return;
       if (room.players.size < 1)        return;
+
+      // Require every active player (host included) to be ready
+      const active = [...room.players.values()].filter(p => !p.disconnected);
+      if (!active.every(p => p.ready)) {
+        return socket.emit('room:error', { message: 'Waiting for all players to ready up' });
+      }
 
       room.state     = 'in-progress';
       room.date      = todayStr();

@@ -186,6 +186,19 @@
       padding: 1px 5px;
     }
     .player-list li.is-you { color: var(--teal); }
+    .player-list li.is-disconnected { opacity: 0.45; }
+    .player-ready-pill {
+      margin-left: auto;
+      font-size: 8px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border: 1px solid;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .player-ready-pill.ready    { color: var(--teal);  border-color: var(--teal);  background: rgba(0,201,167,0.10); }
+    .player-ready-pill.notready { color: var(--text-dim); border-color: rgba(255,255,255,0.12); }
 
     .waiting-status {
       font-family: var(--font-mono);
@@ -626,7 +639,8 @@
         <div id="lobby-error-waiting"></div>
 
         <div class="lobby-actions">
-          <button id="start-btn" class="lobby-btn primary" hidden>Start Game</button>
+          <button id="ready-btn" class="lobby-btn">I'm Ready</button>
+          <button id="start-btn" class="lobby-btn primary" hidden disabled>Start Game</button>
         </div>
 
         <a href="/" class="back-link" style="align-self:flex-start">← Back to Daily</a>
