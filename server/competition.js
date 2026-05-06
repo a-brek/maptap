@@ -45,6 +45,7 @@ class Room {
     this.roundTimer   = null;
     this.roundStart   = null;
     this.roundGuesses = new Map();
+    this.roundEnded   = false;
   }
 
   playerList() {
@@ -96,6 +97,7 @@ function checkAllGuessed(io, room) {
 
 function startRound(io, room, roundIndex) {
   room.round        = roundIndex;
+  room.roundEnded   = false;
   room.roundGuesses = new Map();
   room.roundStart   = Date.now();
 
@@ -113,6 +115,8 @@ function startRound(io, room, roundIndex) {
 }
 
 function endRound(io, room) {
+  if (room.roundEnded) return;
+  room.roundEnded = true;
   clearTimeout(room.roundTimer);
   room.roundTimer = null;
 
