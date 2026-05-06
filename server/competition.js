@@ -42,10 +42,11 @@ class Room {
     this.round        = -1;
     this.locations    = null;
     this.date         = null;
-    this.roundTimer   = null;
-    this.roundStart   = null;
-    this.roundGuesses = new Map();
-    this.roundEnded   = false;
+    this.roundTimer       = null;
+    this.roundStart       = null;
+    this.roundGuesses     = new Map();
+    this.roundEnded       = false;
+    this.roundDurationMs  = 10_000;
   }
 
   playerList() {
@@ -101,17 +102,18 @@ function startRound(io, room, roundIndex) {
   room.roundGuesses = new Map();
   room.roundStart   = Date.now();
 
-  const loc = room.locations[roundIndex];
+  const loc      = room.locations[roundIndex];
+  const duration = room.roundDurationMs;
   io.to(room.code).emit('game:round-start', {
     round:    roundIndex,
     total:    room.locations.length,
     cityName: loc.name,
     world:    loc.world || 'earth',
     tier:     loc.tier,
-    duration: ROUND_DURATION_MS,
+    duration,
   });
 
-  room.roundTimer = setTimeout(() => endRound(io, room), ROUND_DURATION_MS);
+  room.roundTimer = setTimeout(() => endRound(io, room), duration);
 }
 
 function endRound(io, room) {
@@ -130,7 +132,7 @@ function endRound(io, room) {
     let roundScore = { accuracyScore: 0, speedBonus: 0, total: 0, noGuess: true };
 
     if (guess) {
-      const timeRemaining  = Math.max(0, ROUND_DURATION_MS - (guess.submittedAt - room.roundStart)) / 1000;
+      const timeRemaining  = Math.max(0, room.roundDurationMs - (guess.submittedAt - room.roundStart)) / 1000;
       const distKm         = haversine(guess.lat, guess.lng, loc.lat, loc.lng, params.R);
       const accuracyScore  = calcScore(distKm, params.maxDist);
       const speedBonus     = Math.round((timeRemaining / 10) * loc.tier * 5);
@@ -276,7 +278,7 @@ function attachCompetition(io, sessionMiddleware) {
             cityName:     loc.name,
             world:        loc.world || 'earth',
             tier:         loc.tier,
-            timeLeftMs:   Math.max(0, ROUND_DURATION_MS - (Date.now() - room.roundStart)),
+            timeLeftMs:   Math.max(0, room.roundDurationMs - (Date.now() - room.roundStart)),
             alreadyGuessed: room.roundGuesses.has(socket.id),
             totalScore:   existing.totalScore,
           };
@@ -325,7 +327,7 @@ function attachCompetition(io, sessionMiddleware) {
       io.to(room.code).emit('room:players-updated', { players: room.playerList() });
     });
 
-    socket.on('host:start', () => {
+    socket.on('host:start', (payload) => {
       const code = socketToRoom.get(socket.id);
       const room = code && rooms.get(code);
       if (!room)                        return;
@@ -338,6 +340,10 @@ function attachCompetition(io, sessionMiddleware) {
       if (!active.every(p => p.ready)) {
         return socket.emit('room:error', { message: 'Waiting for all players to ready up' });
       }
+
+      const ALLOWED_DURATIONS = new Set([10_000, 12_000, 15_000]);
+      const requestedMs = (payload?.roundDurationSecs ?? 10) * 1000;
+      room.roundDurationMs = ALLOWED_DURATIONS.has(requestedMs) ? requestedMs : 10_000;
 
       room.state     = 'in-progress';
       room.date      = todayStr();

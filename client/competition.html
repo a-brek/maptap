@@ -154,6 +154,30 @@
       border-color: var(--teal);
     }
 
+    .duration-picker {
+      display: flex;
+      gap: 6px;
+    }
+    .duration-btn {
+      flex: 1;
+      padding: 7px 0;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.18);
+      color: var(--text-muted, rgba(255,255,255,0.5));
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .duration-btn:hover { border-color: var(--teal); color: var(--teal); }
+    .duration-btn.active {
+      border-color: var(--teal);
+      color: var(--teal);
+      background: rgba(0,201,167,0.12);
+    }
+
     .player-list {
       list-style: none;
       padding: 0;
@@ -637,6 +661,15 @@
         <div class="waiting-status" id="waiting-status">Waiting for players…</div>
 
         <div id="lobby-error-waiting"></div>
+
+        <div id="duration-field" class="lobby-field host-only" hidden>
+          <div class="lobby-label">Seconds per round</div>
+          <div class="duration-picker">
+            <button class="duration-btn active" data-secs="10">10s</button>
+            <button class="duration-btn" data-secs="12">12s</button>
+            <button class="duration-btn" data-secs="15">15s</button>
+          </div>
+        </div>
 
         <div class="lobby-actions">
           <button id="ready-btn" class="lobby-btn">I'm Ready</button>

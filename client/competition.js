@@ -70,6 +70,7 @@ const state = {
   rings:            [],
   labels:           [],
   currentWorld:     'earth',
+  roundDurationSecs: 10,
 };
 
 let globe = null;
@@ -293,10 +294,13 @@ function showLobbyWaiting(code, players, isHost, roomName) {
   qs('#room-name-display').textContent = roomName || '';
   renderPlayerList(players);
   const startBtn = qs('#start-btn');
+  const durationField = qs('#duration-field');
   if (isHost) {
     startBtn.removeAttribute('hidden');
+    durationField.removeAttribute('hidden');
   } else {
     startBtn.setAttribute('hidden', '');
+    durationField.setAttribute('hidden', '');
   }
   if (navigator.share) qs('#share-link-btn').removeAttribute('hidden');
 }
@@ -761,7 +765,15 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   qs('#start-btn').addEventListener('click', () => {
-    state.socket.emit('host:start');
+    state.socket.emit('host:start', { roundDurationSecs: state.roundDurationSecs });
+  });
+
+  document.querySelectorAll('.duration-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.roundDurationSecs = parseInt(btn.dataset.secs, 10);
+    });
   });
 
   qs('#ready-btn').addEventListener('click', () => {
