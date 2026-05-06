@@ -458,35 +458,177 @@ function showRoundResults(data) {
   qs('#round-results').removeAttribute('hidden');
 }
 
+function buildBreakdownTable(scores) {
+  if (!scores || scores.length === 0) return '<div style="color:var(--text-dim);font-size:10px;padding:4px 0;">No round data</div>';
+  let rows = '';
+  scores.forEach((rs, idx) => {
+    if (rs.noGuess) {
+      rows += `<tr>
+        <td>${idx + 1}</td>
+        <td class="bd-no-guess" colspan="4">No guess</td>
+      </tr>`;
+    } else {
+      const dist = rs.distanceKm != null ? `${rs.distanceKm.toLocaleString()} km` : '—';
+      rows += `<tr>
+        <td>${idx + 1}</td>
+        <td>${rs.accuracyScore}</td>
+        <td>+${rs.speedBonus}</td>
+        <td class="bd-total">${rs.total}</td>
+        <td style="color:var(--text-dim)">${dist}</td>
+      </tr>`;
+    }
+  });
+  return `<table class="breakdown-table">
+    <thead><tr><th>Rd</th><th>Accuracy</th><th>Speed</th><th>Round</th><th>Distance</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
 function showFinalStandings(data) {
   qs('#round-results').setAttribute('hidden', '');
   qs('#hud').setAttribute('hidden', '');
   qs('#clue-panel').classList.remove('visible');
   qs('#clue-panel').setAttribute('hidden', '');
 
-  const { finalStandings } = data;
+  const { finalStandings, roomName } = data;
+  state.finalStandings = finalStandings;
+  state.roomName       = roomName || null;
+
   const podium = qs('#podium-row');
   podium.innerHTML = '';
 
+  const medals = ['🥇', '🥈', '🥉'];
+
   finalStandings.forEach((p, i) => {
-    const div = document.createElement('div');
-    div.classList.add('podium-entry');
-    if (i === 0) div.classList.add('rank-1');
-    else if (i === 1) div.classList.add('rank-2');
-    else if (i === 2) div.classList.add('rank-3');
-    if (p.socketId === state.mySocketId) div.classList.add('is-me');
-    const medals = ['🥇', '🥈', '🥉'];
+    const entry = document.createElement('div');
+    entry.classList.add('podium-entry');
+    if (i === 0) entry.classList.add('rank-1');
+    else if (i === 1) entry.classList.add('rank-2');
+    else if (i === 2) entry.classList.add('rank-3');
+    if (p.socketId === state.mySocketId) entry.classList.add('is-me');
+
     const av = p.avatar ? `<img class="podium-avatar" src="${avatarUrl(p.avatar)}" alt="" />` : '';
-    div.innerHTML = `
+    const isMe = p.socketId === state.mySocketId;
+
+    const mainRow = document.createElement('div');
+    mainRow.className = 'podium-main-row';
+    mainRow.innerHTML = `
       <div class="podium-rank">${medals[i] || i + 1}</div>
       ${av}
-      <div class="podium-name">${escapeHtml(p.displayName)}${p.socketId === state.mySocketId ? ' <span style="font-size:9px;color:var(--teal)">(you)</span>' : ''}</div>
+      <div class="podium-name">${escapeHtml(p.displayName)}${isMe ? ' <span style="font-size:9px;color:var(--teal)">(you)</span>' : ''}</div>
       <div class="podium-score">${p.totalScore}</div>
+      <div class="podium-chevron">▾</div>
     `;
-    podium.appendChild(div);
+
+    const breakdown = document.createElement('div');
+    breakdown.className = 'podium-breakdown';
+    breakdown.hidden = true;
+    breakdown.innerHTML = buildBreakdownTable(p.scores);
+
+    mainRow.addEventListener('click', () => {
+      breakdown.hidden = !breakdown.hidden;
+      entry.classList.toggle('expanded', !breakdown.hidden);
+    });
+
+    entry.appendChild(mainRow);
+    entry.appendChild(breakdown);
+    podium.appendChild(entry);
   });
 
+  // Wire up share button
+  const shareBtn = qs('#comp-share-btn');
+  shareBtn.onclick = () => shareResults(finalStandings, roomName);
+
+  // Wire up leaderboard toggle
+  const lbToggle = qs('#comp-lb-toggle');
+  const lbDiv    = qs('#comp-leaderboard');
+  let lbLoaded = false;
+  lbToggle.onclick = async () => {
+    const isOpen = !lbDiv.hidden;
+    lbDiv.hidden = isOpen;
+    lbToggle.textContent = isOpen ? 'All-Time Leaderboard ▾' : 'All-Time Leaderboard ▴';
+    if (!isOpen && !lbLoaded) {
+      lbLoaded = true;
+      lbDiv.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);padding:8px 0;">Loading…</div>';
+      try {
+        const res = await fetch('/api/leaderboard/battle');
+        const json = await res.json();
+        lbDiv.innerHTML = renderBattleLeaderboard(json);
+      } catch (_) {
+        lbDiv.innerHTML = '<div style="color:#ff6b6b;font-family:var(--font-mono);font-size:10px;">Failed to load</div>';
+      }
+    }
+  };
+
   qs('#comp-game-over').removeAttribute('hidden');
+}
+
+function generateShareText(finalStandings, roomName) {
+  const medals = ['🥇', '🥈', '🥉'];
+  const lines = ['🗺️ Map Battle'];
+  if (roomName) lines.push(roomName);
+  lines.push('─────────────');
+  finalStandings.forEach((p, i) => {
+    const isMe = p.socketId === state.mySocketId;
+    lines.push(`${medals[i] || (i + 1) + '.'} ${p.displayName}${isMe ? ' ← me' : ''} — ${p.totalScore}`);
+  });
+  lines.push('─────────────');
+  lines.push(window.location.origin + '/compete');
+  return lines.join('\n');
+}
+
+async function shareResults(finalStandings, roomName) {
+  const text = generateShareText(finalStandings, roomName);
+  const btn = qs('#comp-share-btn');
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Map Battle Results', text });
+      return;
+    } catch (_) { /* user cancelled */ }
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (_) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (_) {}
+    document.body.removeChild(ta);
+  }
+  const orig = btn.textContent;
+  btn.textContent = 'Copied!';
+  btn.classList.add('copied');
+  setTimeout(() => {
+    btn.textContent = orig;
+    btn.classList.remove('copied');
+  }, 1800);
+}
+
+function renderBattleLeaderboard(data) {
+  const { entries, viewerRank } = data;
+  if (!entries || entries.length === 0) {
+    return '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);padding:8px 0;">No battle scores yet. Be the first!</div>';
+  }
+  let rows = '';
+  entries.forEach(e => {
+    const isMe = viewerRank != null && e.rank === viewerRank;
+    const wins = e.wins > 0 ? ` <span style="color:var(--amber);font-size:9px">${e.wins}W</span>` : '';
+    rows += `<tr class="${isMe ? 'lb-me' : ''}">
+      <td class="lb-rank">${e.rank}</td>
+      <td>${escapeHtml(e.displayName)}${wins}</td>
+      <td class="lb-score">${e.totalScore}</td>
+      <td style="color:var(--text-dim);font-size:9px">${e.playerCount}P</td>
+    </tr>`;
+  });
+  const footer = viewerRank ? `<div style="font-family:var(--font-mono);font-size:9px;color:var(--teal);padding:6px 0 0">Your best rank: #${viewerRank}</div>` : '';
+  return `<table class="battle-lb-table">
+    <thead><tr><th>#</th><th>Player</th><th>Best Score</th><th>Size</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>${footer}`;
 }
 
 // ── Guest notification ──────────────────────────────────────
@@ -661,6 +803,7 @@ function initSocket() {
   });
 
   socket.on('game:finished', (data) => {
+    stopNextRoundCountdown();
     showFinalStandings(data);
   });
 }

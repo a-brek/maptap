@@ -171,5 +171,22 @@ httpServer.listen(PORT, async () => {
   } catch (err) {
     console.warn('Migration warning:', err.message);
   }
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS battle_scores (
+        id           SERIAL PRIMARY KEY,
+        played_at    TIMESTAMPTZ DEFAULT NOW(),
+        room_code    VARCHAR(6),
+        user_id      INT REFERENCES users(id),
+        display_name TEXT NOT NULL,
+        total_score  INT NOT NULL,
+        rank         INT NOT NULL,
+        player_count INT NOT NULL,
+        round_scores JSONB
+      )
+    `);
+  } catch (err) {
+    console.warn('Battle scores migration warning:', err.message);
+  }
   console.log(`\n  🌍  Tap Map running at http://localhost:${PORT}\n`);
 });

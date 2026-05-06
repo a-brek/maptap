@@ -1,6 +1,7 @@
 'use strict';
 
 const { getLocationsForDate, haversine, calcScore, WORLD_PARAMS } = require('./routes/puzzle');
+const db = require('./db');
 
 const rooms       = new Map(); // code → Room
 const socketToRoom = new Map(); // socketId → code
@@ -173,7 +174,25 @@ function endRound(io, room) {
   if (room.round >= room.locations.length - 1) {
     room.state = 'finished';
     setTimeout(() => {
-      io.to(room.code).emit('game:finished', { finalStandings: results });
+      // Attach full round-by-round scores to each standing
+      const finalStandings = results.map(r => {
+        const player = room.players.get(r.socketId);
+        return { ...r, scores: player ? player.scores : [] };
+      });
+      io.to(room.code).emit('game:finished', { finalStandings, roomName: room.roomName });
+
+      // Persist to DB for all-time leaderboard
+      const playerCount = finalStandings.length;
+      finalStandings.forEach((r, rankIdx) => {
+        const player = room.players.get(r.socketId);
+        if (!player?.userId) return;
+        db.query(
+          `INSERT INTO battle_scores (room_code, user_id, display_name, total_score, rank, player_count, round_scores)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [room.code, player.userId, r.displayName, r.totalScore, rankIdx + 1, playerCount, JSON.stringify(player.scores)]
+        ).catch(err => console.error('Failed to save battle score:', err));
+      });
+
       setTimeout(() => rooms.delete(room.code), ROOM_TTL_MS);
     }, REVEAL_PAUSE_MS);
   } else {

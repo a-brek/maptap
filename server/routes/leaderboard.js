@@ -85,4 +85,54 @@ router.get('/alltime', async (req, res) => {
   }
 });
 
+// ── GET /api/leaderboard/battle ───────────────────────────
+// All-time best battle scores (one entry per unique player — their personal best)
+router.get('/battle', async (req, res) => {
+  try {
+    const { rows } = await db.query(`
+      WITH best AS (
+        SELECT DISTINCT ON (COALESCE(user_id::text, display_name))
+          user_id, display_name, total_score, player_count, played_at
+        FROM battle_scores
+        ORDER BY COALESCE(user_id::text, display_name), total_score DESC
+      )
+      SELECT
+        RANK() OVER (ORDER BY best.total_score DESC)::int AS rank,
+        COALESCE(u.username, best.display_name)           AS display_name,
+        u.username,
+        u.avatar_url,
+        best.total_score,
+        best.player_count,
+        best.played_at,
+        (SELECT COUNT(*) FROM battle_scores b2
+           WHERE b2.user_id = best.user_id AND b2.rank = 1 AND best.user_id IS NOT NULL
+        )::int AS wins
+      FROM best
+      LEFT JOIN users u ON u.id = best.user_id
+      ORDER BY best.total_score DESC
+      LIMIT 50
+    `);
+
+    const viewerRank = req.isAuthenticated()
+      ? rows.find(r => r.username === req.user?.username)?.rank ?? null
+      : null;
+
+    res.json({
+      entries: rows.map(r => ({
+        rank:        r.rank,
+        displayName: r.display_name,
+        username:    r.username || null,
+        avatarUrl:   r.avatar_url || null,
+        totalScore:  r.total_score,
+        playerCount: r.player_count,
+        wins:        r.wins || 0,
+      })),
+      viewerRank,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch battle leaderboard' });
+  }
+});
+
 module.exports = router;
