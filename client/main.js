@@ -410,7 +410,7 @@ function initGlobe() {
     .labelLat('lat')
     .labelLng('lng')
     .labelText('text')
-    .labelSize(d => d.isCountryName ? 0.28 : (d.ocean ? 0.55 : 0.75))
+    .labelSize(d => d.highlighted ? 0.6 : (d.isCountryName ? 0.3 : (d.ocean ? 0.55 : 0.75)))
     .labelColor('color')
     .labelDotRadius(d => (d.ocean || d.isCountryName) ? 0 : 0.32)
     .labelIncludeDot(d => !d.ocean && !d.isCountryName)
@@ -581,16 +581,31 @@ function findCountry(geo, rawName) {
 
 async function showCountryHighlight(countryName) {
   try {
+    let features = [];
     const isoA2 = SPLIT_COUNTRY_ISO[countryName.toLowerCase()];
     if (isoA2) {
       const admin1 = await loadAdmin1Geo();
-      const subdivs = getSubdivisions(admin1, isoA2);
-      if (subdivs.length) globe.polygonsData(subdivs);
-      return;
+      features = getSubdivisions(admin1, isoA2);
+    } else {
+      const geo     = await loadWorldGeo();
+      const feature = findCountry(geo, countryName);
+      if (feature) features = [feature];
     }
-    const geo     = await loadWorldGeo();
-    const feature = findCountry(geo, countryName);
-    if (feature) globe.polygonsData([feature]);
+    if (!features.length) return;
+    globe.polygonsData(features);
+
+    // Add a large, bright country name label at the polygon centroid
+    const centroid = _featureCentroid(features[0]);
+    if (centroid) {
+      state.labels.push({
+        lat: centroid[1], lng: centroid[0],
+        text: countryName,
+        color: '#00c9a7',
+        isCountryName: true,
+        highlighted: true,
+      });
+      globe.labelsData([ZAC_LABEL, ...state.labels]);
+    }
   } catch (err) {
     console.warn('Country highlight failed:', err);
   }
@@ -664,21 +679,30 @@ async function showAllCountryBordersAndNames() {
       return false;
     }
 
-    // Labels: country names for world features, state names for subdivisions
+    // Labels: country names at centroids — highlighted ones are large+teal
     const countryLabels = allFeatures.map(f => {
       const c = _featureCentroid(f);
       if (!c) return null;
       const text = f.properties.name || f.properties.NAME || '';
-      return { lat: c[1], lng: c[0], text, color: 'rgba(200,220,255,0.5)', isCountryName: true };
+      const hi = isHighlighted(f);
+      return {
+        lat: c[1], lng: c[0], text,
+        color: hi ? '#00c9a7' : 'rgba(200,220,255,0.65)',
+        isCountryName: true,
+        highlighted: hi,
+      };
     }).filter(Boolean);
 
-    globe.labelsData([ZAC_LABEL, ...state.labels, ...countryLabels]);
+    // Use the city/answer labels from state (drop per-round country highlights — replaced by the richer set below)
+    const cityLabels = state.labels.filter(l => !l.isCountryName);
+    globe.labelsData([ZAC_LABEL, ...cityLabels, ...countryLabels]);
 
     globe
       .polygonsData(allFeatures)
-      .polygonCapColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.15)' : 'rgba(255,255,255,0.02)')
-      .polygonSideColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.08)' : 'rgba(255,255,255,0.01)')
-      .polygonStrokeColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.9)' : 'rgba(200,220,255,0.3)');
+      .polygonCapColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.18)' : 'rgba(255,255,255,0.03)')
+      .polygonSideColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.10)' : 'rgba(255,255,255,0.01)')
+      .polygonStrokeColor(f => isHighlighted(f) ? '#00c9a7' : 'rgba(200,220,255,0.5)')
+      .polygonAltitude(f => isHighlighted(f) ? 0.012 : 0.007);
 
     // Re-apply after polygon update to keep markers/arcs on top
     globe.pointsData([...state.markers]);
@@ -1010,13 +1034,14 @@ function showGameOver(skipSave = false) {
     </div>`;
   }).join('');
 
-  // Share text
-  const scores = state.roundScores.map(r => r.score).join(' · ');
+  // Share text — normalize each round to /100 for a clean comparable score
+  const normScores = state.roundScores.map(r => Math.round(r.score / (r.maxScore ?? 100) * 100));
+  const normTotal  = normScores.reduce((a, b) => a + b, 0);
   const shareText = [
     `Tap Map ${state.date}`,
-    scores,
+    normScores.join(' · '),
     `https://maptap.onrender.com`,
-    `Total Score: ${state.totalScore}/500`,
+    `Total: ${normTotal}/500`,
   ].join('\n');
   qs('#share-text').textContent = shareText;
 
