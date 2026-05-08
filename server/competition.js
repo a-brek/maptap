@@ -26,7 +26,11 @@ function todayStr() {
 }
 
 function randomSeed() {
-  return `comp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  // getLocationsForDate needs a YYYY-MM-DD string; pick a random offset so
+  // competition rooms don't reuse today's daily puzzle locations
+  const offset = Math.floor(Math.random() * 1000);
+  const d = new Date(Date.UTC(2020, 0, 1) + offset * 86_400_000);
+  return d.toISOString().slice(0, 10);
 }
 
 function newPlayerId() {
@@ -104,6 +108,10 @@ function startRound(io, room, roundIndex) {
   room.roundStart   = Date.now();
 
   const loc      = room.locations[roundIndex];
+  if (!loc) {
+    console.error(`startRound: missing location at index ${roundIndex}`, room.locations);
+    return;
+  }
   const duration = room.roundDurationMs;
   io.to(room.code).emit('game:round-start', {
     round:    roundIndex,
