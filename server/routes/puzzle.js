@@ -35,9 +35,13 @@ function haversine(lat1, lng1, lat2, lng2, R = 6371) {
 // ---------------------------------------------------------------------------
 // Scoring
 // ---------------------------------------------------------------------------
+// Harder rounds are worth more — matches maptap.gg difficulty weighting.
+// Tier 1+2 = 1×, Tier 3 = 2×, Tier 4+5 = 3× → max 1000 total per game.
+const TIER_MULTIPLIERS = { 1: 1, 2: 1, 3: 2, 4: 3, 5: 3 };
+
 function calcScore(distKm, maxDist = 2000) {
-  // Exponential decay — halflife at 60% of maxDist (gentler mid-range dropoff)
-  return Math.round(100 * Math.exp(-distKm * Math.LN2 / (maxDist * 0.6)));
+  // Exponential decay — halflife at 80% of maxDist for gentler mid-range dropoff
+  return Math.round(100 * Math.exp(-distKm * Math.LN2 / (maxDist * 0.8)));
 }
 
 // ---------------------------------------------------------------------------
@@ -164,15 +168,18 @@ router.post('/:date/reveal/:round', (req, res) => {
     return res.status(404).json({ error: 'Round not found' });
   }
 
-  const world  = location.world || 'earth';
-  const params = WORLD_PARAMS[world] || WORLD_PARAMS.earth;
+  const world      = location.world || 'earth';
+  const params     = WORLD_PARAMS[world] || WORLD_PARAMS.earth;
   const distanceKm = haversine(lat, lng, location.lat, location.lng, params.R);
-  const score      = calcScore(distanceKm, params.maxDist);
+  const multiplier = TIER_MULTIPLIERS[location.tier] || 1;
+  const score      = Math.round(calcScore(distanceKm, params.maxDist) * multiplier);
+  const maxScore   = 100 * multiplier;
 
   res.json({
     actual: { lat: location.lat, lng: location.lng, name: location.name, world },
     distanceKm: Math.round(distanceKm),
     score,
+    maxScore,
   });
 });
 

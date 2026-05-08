@@ -59,20 +59,21 @@ function soundConfirm() {
   playTone(440, 'sine', 0.15, 0.12);
 }
 
-function soundReveal(score) {
-  if (score >= 90) {
+function soundReveal(score, maxScore = 100) {
+  const pct = maxScore > 0 ? (score / maxScore) * 100 : 0;
+  if (pct >= 90) {
     // Pinpoint — ascending triumphant chime
     playTone(523, 'sine', 0.18, 0.18, 0.00);
     playTone(659, 'sine', 0.18, 0.18, 0.12);
     playTone(784, 'sine', 0.22, 0.35, 0.24);
-  } else if (score >= 70) {
+  } else if (pct >= 70) {
     // Close — bright double tone
     playTone(523, 'sine', 0.18, 0.18, 0.00);
     playTone(659, 'sine', 0.18, 0.28, 0.14);
-  } else if (score >= 40) {
+  } else if (pct >= 40) {
     // Nearby — single mid tone
     playTone(440, 'sine', 0.16, 0.25, 0.00);
-  } else if (score > 0) {
+  } else if (pct > 0) {
     // Far — descending tone
     playTone(330, 'sine', 0.14, 0.20, 0.00);
     playTone(262, 'sine', 0.12, 0.25, 0.15);
@@ -82,27 +83,29 @@ function soundReveal(score) {
   }
 }
 
-function scoreEmoji(score) {
-  if (score >= 90) return '🟢';
-  if (score >= 70) return '🟡';
-  if (score >= 40) return '🟠';
-  if (score >   0) return '🔴';
+function scoreEmoji(score, maxScore = 100) {
+  const pct = maxScore > 0 ? (score / maxScore) * 100 : 0;
+  if (pct >= 90) return '🟢';
+  if (pct >= 70) return '🟡';
+  if (pct >= 40) return '🟠';
+  if (pct >   0) return '🔴';
   return '⚫';
 }
 
-function scoreQuality(score) {
-  if (score >= 90) return ['Pinpoint', 'q-pinpoint'];
-  if (score >= 70) return ['Close',    'q-close'];
-  if (score >= 40) return ['Nearby',   'q-nearby'];
-  if (score >   0) return ['Far',      'q-far'];
+function scoreQuality(score, maxScore = 100) {
+  const pct = maxScore > 0 ? (score / maxScore) * 100 : 0;
+  if (pct >= 90) return ['Pinpoint', 'q-pinpoint'];
+  if (pct >= 70) return ['Close',    'q-close'];
+  if (pct >= 40) return ['Nearby',   'q-nearby'];
+  if (pct >   0) return ['Far',      'q-far'];
   return ['Miss', 'q-miss'];
 }
 
 function scoreGrade(total) {
-  if (total >= 450) return 'Navigator';
-  if (total >= 350) return 'Cartographer';
-  if (total >= 250) return 'Traveler';
-  if (total >= 150) return 'Explorer';
+  if (total >= 900) return 'Navigator';
+  if (total >= 700) return 'Cartographer';
+  if (total >= 500) return 'Traveler';
+  if (total >= 300) return 'Explorer';
   return 'Landlubber';
 }
 
@@ -741,15 +744,15 @@ async function confirmGuess() {
   const { lat, lng } = state.pendingGuess;
 
   try {
-    const { actual, distanceKm, score } = await revealLocation(state.date, state.round, lat, lng);
-    soundReveal(score);
+    const { actual, distanceKm, score, maxScore } = await revealLocation(state.date, state.round, lat, lng);
+    soundReveal(score, maxScore);
 
     // Record round result — include location metadata for analytics
-    const emoji   = scoreEmoji(score);
+    const emoji   = scoreEmoji(score, maxScore);
     const country = actual.name.includes(',')
       ? actual.name.split(',').pop().trim()
       : actual.name;
-    state.roundScores.push({ score, distanceKm, emoji, locationName: actual.name, country });
+    state.roundScores.push({ score, maxScore, distanceKm, emoji, locationName: actual.name, country });
 
     // Upgrade pending → confirmed guess marker
     state.markers = state.markers.map(m =>
@@ -807,7 +810,7 @@ async function confirmGuess() {
     // Score popup after fly-in
     setTimeout(() => {
       hideCluePanel();
-      showScorePopup(score, distanceKm, actual);
+      showScorePopup(score, maxScore, distanceKm, actual);
     }, 1500);
 
   } catch (err) {
@@ -855,10 +858,10 @@ function hideCluePanel() {
 }
 
 // ── Score Popup ────────────────────────────────────────────
-function showScorePopup(score, distanceKm, actual) {
-  const [label, cls] = scoreQuality(score);
+function showScorePopup(score, maxScore = 100, distanceKm, actual) {
+  const [label, cls] = scoreQuality(score, maxScore);
 
-  qs('#popup-score').textContent    = `+${score}`;
+  qs('#popup-score').textContent    = `+${score} / ${maxScore}`;
   qs('#popup-distance').textContent = distanceKm < 2
     ? 'Basically spot on!'
     : `${distanceKm.toLocaleString()} km away`;
@@ -1003,7 +1006,7 @@ function showGameOver(skipSave = false) {
       <span class="breakdown-emoji">${r.emoji}</span>
       <span class="breakdown-label">${label}</span>
       <span class="breakdown-dist">${km} km off</span>
-      <span class="breakdown-score">+${r.score}</span>
+      <span class="breakdown-score">+${r.score}<span class="breakdown-max"> / ${r.maxScore ?? 100}</span></span>
     </div>`;
   }).join('');
 
