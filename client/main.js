@@ -190,14 +190,6 @@ function startUfoOrbit() {
 
 
 
-// ── Iran–Israel Missile Conflict ──────────────────────────
-const _IRAN   = { lat: 32.4, lng: 53.7 };
-const _ISRAEL = { lat: 31.7, lng: 35.2 };
-
-function _scatter(center, spread) {
-  return center + (Math.random() - 0.5) * spread;
-}
-
 function spawnExplosion(lat, lng) {
   if (typeof THREE === 'undefined') return;
   const pos = globe.getCoords(lat, lng, 0.03);
@@ -311,27 +303,6 @@ function spawnMissile(fromLat, fromLng, toLat, toLng, headColor) {
   })(t0);
 }
 
-function startMissileConflict() {
-  function iranFires() {
-    spawnMissile(
-      _scatter(_IRAN.lat,   3),   _scatter(_IRAN.lng,   4),
-      _scatter(_ISRAEL.lat, 0.5), _scatter(_ISRAEL.lng, 0.7),
-      0xff5500 // orange-red
-    );
-    setTimeout(iranFires, 700 + Math.random() * 1000);
-  }
-  function israelFires() {
-    spawnMissile(
-      _scatter(_ISRAEL.lat, 0.5), _scatter(_ISRAEL.lng, 0.7),
-      _scatter(_IRAN.lat,   3),   _scatter(_IRAN.lng,   4),
-      0x44ccff // cyan-blue
-    );
-    setTimeout(israelFires, 800 + Math.random() * 1100);
-  }
-  iranFires();
-  setTimeout(israelFires, 350);
-}
-
 // ── Hard Mode Toggle ────────────────────────────────────────────
 let _hardMode = false;
 function toggleHardMode() {
@@ -410,11 +381,11 @@ function initGlobe() {
     .labelLat('lat')
     .labelLng('lng')
     .labelText('text')
-    .labelSize(d => d.size || (d.highlighted ? 1.8 : (d.isCountryName ? 1.4 : (d.ocean ? 0.55 : 0.75))))
+    .labelSize(d => d.size || (d.isCountryName ? (d.highlighted ? 0.4 : 0.28) : (d.ocean ? 0.55 : 0.75)))
     .labelColor(d => d.color || '#ffffff')
     .labelDotRadius(d => (d.ocean || d.isCountryName) ? 0 : 0.32)
     .labelIncludeDot(d => !d.ocean && !d.isCountryName)
-    .labelAltitude(d => d.isCountryName ? 0.05 : 0.025)
+    .labelAltitude(d => d.isCountryName ? 0.01 : 0.025)
     .labelResolution(6)
     // HTML elements (UFO)
     .htmlElementsData([])
@@ -696,6 +667,9 @@ async function showAllCountryBordersAndNames() {
     // Use the city/answer labels from state (drop per-round country highlights — replaced by the richer set below)
     const cityLabels = state.labels.filter(l => !l.isCountryName);
     globe.labelsData([ZAC_LABEL, ...cityLabels, ...countryLabels]);
+    globe
+      .labelSize(d => d.size || (d.isCountryName ? (d.highlighted ? 0.4 : 0.28) : (d.ocean ? 0.55 : 0.75)))
+      .labelAltitude(d => d.isCountryName ? 0.01 : 0.025);
 
     globe
       .polygonsData(allFeatures)
@@ -1255,7 +1229,6 @@ function setGlobeWorld(world) {
 // ── Init ───────────────────────────────────────────────────
 async function init() {
   initGlobe();
-  startMissileConflict();
   startUfoOrbit();
 
   // Wire up events
