@@ -79,33 +79,37 @@ const DATE_OVERRIDES = {
 // Pick 5 random locations for a given date string (deterministic)
 // ---------------------------------------------------------------------------
 // Pick one location per tier (1–5) so rounds go easy → hard.
-// Each tier pool is shuffled with the same date seed, giving daily variety.
-function getLocationsForDate(dateStr) {
-  if (DATE_OVERRIDES[dateStr]) return DATE_OVERRIDES[dateStr];
+// Each tier pool is shuffled once with a fixed seed, then indexed by
+// days-since-epoch mod pool-size — guaranteeing no repeats within a full cycle.
+const EPOCH = new Date('2025-01-01').getTime();
+const MS_PER_DAY = 86400000;
 
-  let hash = 0;
-  for (let i = 0; i < dateStr.length; i++) {
-    hash = Math.imul(31, hash) + dateStr.charCodeAt(i) | 0;
-  }
-
-  // Group locations by tier
+// Pre-shuffle each tier once with a fixed seed so the cycle order is stable
+const TIER_CYCLES = (() => {
   const tiers = { 1: [], 2: [], 3: [], 4: [], 5: [] };
-  for (const loc of locations) {
-    tiers[loc.tier].push(loc);
-  }
-
-  // Pick one from each tier using the date seed
-  const rand = seededRng(hash);
-  const result = [];
+  for (const loc of locations) tiers[loc.tier].push(loc);
+  const rand = seededRng(0xdeadbeef);
+  const cycles = {};
   for (let t = 1; t <= 5; t++) {
-    const pool = tiers[t];
-    // Shuffle pool with seeded rng
-    const shuffled = [...pool];
+    const shuffled = [...tiers[t]];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(rand() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    result.push(shuffled[0]);
+    cycles[t] = shuffled;
+  }
+  return cycles;
+})();
+
+function getLocationsForDate(dateStr) {
+  if (DATE_OVERRIDES[dateStr]) return DATE_OVERRIDES[dateStr];
+
+  const dayIndex = Math.floor((new Date(dateStr + 'T12:00:00Z').getTime() - EPOCH) / MS_PER_DAY);
+
+  const result = [];
+  for (let t = 1; t <= 5; t++) {
+    const pool = TIER_CYCLES[t];
+    result.push(pool[((dayIndex % pool.length) + pool.length) % pool.length]);
   }
   return result;
 }

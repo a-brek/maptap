@@ -410,12 +410,12 @@ function initGlobe() {
     .labelLat('lat')
     .labelLng('lng')
     .labelText('text')
-    .labelSize(d => d.highlighted ? 0.6 : (d.isCountryName ? 0.3 : (d.ocean ? 0.55 : 0.75)))
-    .labelColor('color')
+    .labelSize(d => d.size || (d.highlighted ? 1.8 : (d.isCountryName ? 1.4 : (d.ocean ? 0.55 : 0.75))))
+    .labelColor(d => d.color || '#ffffff')
     .labelDotRadius(d => (d.ocean || d.isCountryName) ? 0 : 0.32)
     .labelIncludeDot(d => !d.ocean && !d.isCountryName)
-    .labelAltitude(0.025)
-    .labelResolution(3)
+    .labelAltitude(d => d.isCountryName ? 0.05 : 0.025)
+    .labelResolution(6)
     // HTML elements (UFO)
     .htmlElementsData([])
     .htmlLat('lat')
@@ -687,7 +687,7 @@ async function showAllCountryBordersAndNames() {
       const hi = isHighlighted(f);
       return {
         lat: c[1], lng: c[0], text,
-        color: hi ? '#00c9a7' : 'rgba(200,220,255,0.65)',
+        color: hi ? '#00c9a7' : '#ffffff',
         isCountryName: true,
         highlighted: hi,
       };
@@ -699,9 +699,9 @@ async function showAllCountryBordersAndNames() {
 
     globe
       .polygonsData(allFeatures)
-      .polygonCapColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.18)' : 'rgba(255,255,255,0.03)')
-      .polygonSideColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.10)' : 'rgba(255,255,255,0.01)')
-      .polygonStrokeColor(f => isHighlighted(f) ? '#00c9a7' : 'rgba(200,220,255,0.5)')
+      .polygonCapColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.22)' : 'rgba(255,255,255,0.05)')
+      .polygonSideColor(f => isHighlighted(f) ? 'rgba(0,201,167,0.12)' : 'rgba(255,255,255,0.02)')
+      .polygonStrokeColor(f => isHighlighted(f) ? '#00c9a7' : 'rgba(255,255,255,0.75)')
       .polygonAltitude(f => isHighlighted(f) ? 0.012 : 0.007);
 
     // Re-apply after polygon update to keep markers/arcs on top
