@@ -338,7 +338,7 @@ async function confirmGuess() {
     state.markers.push({ id: `actual-${state.round}`, lat: actual.lat, lng: actual.lng, color: '#00c9a7', size: 0.28, altitude: 0.06 });
     state.rings.push({ lat: actual.lat, lng: actual.lng });
     state.arcs.push({ startLat: lat, startLng: lng, endLat: actual.lat, endLng: actual.lng, color: ['#e89620', '#00c9a7'] });
-    state.labels.push({ lat: actual.lat, lng: actual.lng, text: actual.name, color: '#00c9a7' });
+    state.labels.push({ lat: actual.lat, lng: actual.lng, text: actual.name.replace(/, USA$/, ''), color: '#00c9a7' });
 
     const world = state.puzzle.locations[state.round]?.world || 'earth';
     globe.pointsData([...state.markers]);
@@ -405,7 +405,7 @@ function showScorePopup(score, distanceKm, actual) {
   const [label, cls] = scoreQuality(score);
   qs('#popup-score').textContent    = `+${score}`;
   qs('#popup-distance').textContent = distanceKm < 2 ? 'Basically spot on!' : `${distanceKm.toLocaleString()} km away`;
-  qs('#popup-location').textContent = actual.name;
+  qs('#popup-location').textContent = actual.name.replace(/, USA$/, '');
 
   const qEl = qs('#popup-quality');
   qEl.textContent = label;
@@ -469,7 +469,7 @@ function showGameOver() {
   const breakdown = qs('#score-breakdown');
   breakdown.innerHTML = state.roundScores.map((r, i) => {
     const km = r.distanceKm < 1 ? '<1' : Math.round(r.distanceKm).toLocaleString();
-    const label = r.locationName || `Location ${i + 1}`;
+    const label = (r.locationName || `Location ${i + 1}`).replace(/, USA$/, '');
     return `
     <div class="breakdown-row">
       <span class="breakdown-emoji">${r.emoji}</span>

@@ -452,7 +452,7 @@ function showRoundResults(data) {
   });
 
   qs('#results-round-title').textContent = `Round ${round + 1} Results`;
-  qs('#results-location-name').textContent = data.actual.name;
+  qs('#results-location-name').textContent = data.actual.name.replace(/, USA$/, '');
   qs('#clue-panel').classList.remove('visible');
   qs('#clue-panel').setAttribute('hidden', '');
   qs('#round-results').removeAttribute('hidden');
