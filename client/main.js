@@ -495,14 +495,21 @@ const COUNTRY_ALIASES = {
   'scotland':         'united kingdom',
   'wales':            'united kingdom',
   'northern ireland': 'united kingdom',
+  'uk':               'united kingdom',
   'united states':    'united states of america',
   'usa':              'united states of america',
+  'uae':              'united arab emirates',
   'north korea':      "democratic people's republic of korea",
   'south korea':      'republic of korea',
   'czech republic':   'czechia',
   'ivory coast':      "côte d'ivoire",
   'burma':            'myanmar',
   'tibet':            'china',
+  'bosnia':           'bosnia and herz.',
+  'trinidad':         'trinidad and tobago',
+  'dominican rep.':   'dominican republic',
+  'dr congo':         'dem. rep. congo',
+  'republic of congo':'congo',
 };
 
 // Countries rendered as state/province splits (mapped to ISO-A2)
@@ -543,10 +550,14 @@ function getSubdivisions(admin1Geo, isoA2) {
 }
 
 function findCountry(geo, rawName) {
-  const key  = (COUNTRY_ALIASES[rawName.toLowerCase()] ?? rawName).toLowerCase();
+  const key = (COUNTRY_ALIASES[rawName.toLowerCase()] ?? rawName).toLowerCase();
   return geo.features.find(f => {
     const n = (f.properties.name ?? '').toLowerCase();
-    return n === key || n.includes(key) || key.includes(n);
+    if (n === key) return true;
+    // Only substring-match on longer strings to avoid 'uk' matching 'ukraine', etc.
+    if (key.length > 4 && n.includes(key)) return true;
+    if (n.length > 4 && key.includes(n)) return true;
+    return false;
   }) ?? null;
 }
 
@@ -645,7 +656,10 @@ async function showAllCountryBordersAndNames() {
       // Country feature: check name match
       const name = (f.properties.name || '').toLowerCase();
       for (const h of highlightSet) {
-        if (name === h || name.includes(h) || h.includes(name)) return true;
+        const resolved = (COUNTRY_ALIASES[h] ?? h);
+        if (name === resolved) return true;
+        if (resolved.length > 4 && name.includes(resolved)) return true;
+        if (name.length > 4 && resolved.includes(name)) return true;
       }
       return false;
     }
