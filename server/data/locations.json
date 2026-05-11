@@ -171,7 +171,7 @@
     "name": "Banjul, Gambia",
     "lat": 13.4549,
     "lng": -16.579,
-    "tier": 4
+    "tier": 5
   },
   {
     "name": "Praia, Cape Verde",
@@ -193,15 +193,21 @@
   },
   {
     "name": "Bangui, Central African Republic",
-    "lat": 4.3612,
-    "lng": 18.555,
-    "tier": 4
+    "lat": 4.3947,
+    "lng": 18.5582,
+    "tier": 5
+  },
+  {
+    "name": "Juba, South Sudan",
+    "lat": 4.8594,
+    "lng": 31.5713,
+    "tier": 5
   },
   {
     "name": "Asmara, Eritrea",
     "lat": 15.3389,
     "lng": 38.931,
-    "tier": 4
+    "tier": 5
   },
   {
     "name": "Djibouti City, Djibouti",
@@ -237,13 +243,13 @@
     "name": "Maseru, Lesotho",
     "lat": -29.3167,
     "lng": 27.4833,
-    "tier": 4
+    "tier": 5
   },
   {
     "name": "Mbabane, Eswatini",
     "lat": -26.3054,
     "lng": 31.1367,
-    "tier": 4
+    "tier": 5
   },
   {
     "name": "Lilongwe, Malawi",
@@ -297,7 +303,7 @@
     "name": "Nouakchott, Mauritania",
     "lat": 18.0735,
     "lng": -15.9582,
-    "tier": 4
+    "tier": 5
   },
   {
     "name": "Dodoma, Tanzania",

@@ -84,6 +84,21 @@ const DATE_OVERRIDES = {
 const EPOCH = new Date('2025-01-01').getTime();
 const MS_PER_DAY = 86400000;
 
+// Island locations in Tier 5 — used to interleave island/non-island in the cycle
+// so the final round doesn't land on an island the majority of days.
+const TIER5_ISLAND_NAMES = new Set([
+  'Victoria, Seychelles', 'Moroni, Comoros', 'Male, Maldives',
+  'Bandar Seri Begawan, Brunei', 'Dili, East Timor',
+  'Port Vila, Vanuatu', 'Honiara, Solomon Islands', "Nuku'alofa, Tonga",
+  'Apia, Samoa', 'Funafuti, Tuvalu', 'Tarawa, Kiribati',
+  'Majuro, Marshall Islands', 'Palikir, Micronesia',
+  'Bridgetown, Barbados', 'Roseau, Dominica', 'Castries, Saint Lucia',
+  'Kingstown, Saint Vincent and the Grenadines', "St. George's, Grenada",
+  'Basseterre, Saint Kitts and Nevis', "St. John's, Antigua and Barbuda",
+  'São Tomé, São Tomé and Príncipe', 'Ngerulmud, Palau', 'Yaren, Nauru',
+  'Avarua, Cook Islands', 'Hanga Roa, Easter Island',
+]);
+
 // Pre-shuffle each tier once with a fixed seed so the cycle order is stable
 const TIER_CYCLES = (() => {
   const tiers = { 1: [], 2: [], 3: [], 4: [], 5: [] };
@@ -96,7 +111,21 @@ const TIER_CYCLES = (() => {
       const j = Math.floor(rand() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    cycles[t] = shuffled;
+    if (t === 5) {
+      // Interleave non-island and island so the final round alternates.
+      // Pattern: non-island, island, non-island, island… then remaining islands.
+      const nonIsland = shuffled.filter(l => !TIER5_ISLAND_NAMES.has(l.name));
+      const island    = shuffled.filter(l =>  TIER5_ISLAND_NAMES.has(l.name));
+      const interleaved = [];
+      const len = Math.max(nonIsland.length, island.length);
+      for (let i = 0; i < len; i++) {
+        if (i < nonIsland.length) interleaved.push(nonIsland[i]);
+        if (i < island.length)    interleaved.push(island[i]);
+      }
+      cycles[t] = interleaved;
+    } else {
+      cycles[t] = shuffled;
+    }
   }
   return cycles;
 })();
