@@ -71,6 +71,7 @@ const state = {
   labels:           [],
   currentWorld:     'earth',
   roundDurationSecs: 10,
+  continentFilter: '',
 };
 
 let globe = null;
@@ -295,12 +296,15 @@ function showLobbyWaiting(code, players, isHost, roomName) {
   renderPlayerList(players);
   const startBtn = qs('#start-btn');
   const durationField = qs('#duration-field');
+  const continentField = qs('#continent-field');
   if (isHost) {
     startBtn.removeAttribute('hidden');
     durationField.removeAttribute('hidden');
+    continentField.removeAttribute('hidden');
   } else {
     startBtn.setAttribute('hidden', '');
     durationField.setAttribute('hidden', '');
+    continentField.setAttribute('hidden', '');
   }
   if (navigator.share) qs('#share-link-btn').removeAttribute('hidden');
 }
@@ -474,12 +478,12 @@ function buildBreakdownTable(scores) {
         <td>${rs.accuracyScore}</td>
         <td>+${rs.speedBonus}</td>
         <td class="bd-total">${rs.total}</td>
-        <td style="color:var(--text-dim)">${dist}</td>
+        <td class="bd-dist-col" style="color:var(--text-dim)">${dist}</td>
       </tr>`;
     }
   });
   return `<table class="breakdown-table">
-    <thead><tr><th>Rd</th><th>Accuracy</th><th>Speed</th><th>Round</th><th>Distance</th></tr></thead>
+    <thead><tr><th>Rd</th><th>Accuracy</th><th>Speed</th><th>Round</th><th class="bd-dist-col">Distance</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
@@ -908,7 +912,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   qs('#start-btn').addEventListener('click', () => {
-    state.socket.emit('host:start', { roundDurationSecs: state.roundDurationSecs });
+    const payload = { roundDurationSecs: state.roundDurationSecs };
+    if (state.continentFilter) payload.continent = state.continentFilter;
+    state.socket.emit('host:start', payload);
   });
 
   document.querySelectorAll('.duration-btn').forEach(btn => {
@@ -916,6 +922,14 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       state.roundDurationSecs = parseInt(btn.dataset.secs, 10);
+    });
+  });
+
+  document.querySelectorAll('.continent-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.continent-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.continentFilter = btn.dataset.continent;
     });
   });
 

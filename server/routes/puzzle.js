@@ -143,6 +143,22 @@ function getLocationsForDate(dateStr) {
   return result;
 }
 
+const VALID_CONTINENTS = new Set(['Africa', 'Asia', 'Europe', 'North America', 'South America', 'Oceania']);
+
+// Pick 5 random locations (one per tier) filtered to a continent.
+// Falls back to the full pool for any tier with fewer than 1 matching location.
+function getLocationsForContinent(continent, seed) {
+  const rand = seededRng(seed);
+  const result = [];
+  for (let t = 1; t <= 5; t++) {
+    const pool = TIER_CYCLES[t].filter(l => l.continent === continent);
+    const fallback = TIER_CYCLES[t];
+    const src = pool.length > 0 ? pool : fallback;
+    result.push(src[Math.floor(rand() * src.length)]);
+  }
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/puzzle/today
 // ---------------------------------------------------------------------------
@@ -217,7 +233,9 @@ router.post('/:date/reveal/:round', (req, res) => {
 });
 
 module.exports = router;
-module.exports.getLocationsForDate = getLocationsForDate;
-module.exports.haversine           = haversine;
-module.exports.calcScore           = calcScore;
-module.exports.WORLD_PARAMS        = WORLD_PARAMS;
+module.exports.getLocationsForDate      = getLocationsForDate;
+module.exports.getLocationsForContinent = getLocationsForContinent;
+module.exports.VALID_CONTINENTS         = VALID_CONTINENTS;
+module.exports.haversine                = haversine;
+module.exports.calcScore                = calcScore;
+module.exports.WORLD_PARAMS             = WORLD_PARAMS;

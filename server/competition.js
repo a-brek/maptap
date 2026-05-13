@@ -1,6 +1,6 @@
 'use strict';
 
-const { getLocationsForDate, haversine, calcScore, WORLD_PARAMS } = require('./routes/puzzle');
+const { getLocationsForDate, getLocationsForContinent, VALID_CONTINENTS, haversine, calcScore, WORLD_PARAMS } = require('./routes/puzzle');
 const db = require('./db');
 
 const rooms       = new Map(); // code → Room
@@ -372,10 +372,20 @@ function attachCompetition(io, sessionMiddleware) {
       const requestedMs = (payload?.roundDurationSecs ?? 10) * 1000;
       room.roundDurationMs = ALLOWED_DURATIONS.has(requestedMs) ? requestedMs : 10_000;
 
+      const continent = (payload?.continent && VALID_CONTINENTS.has(payload.continent))
+        ? payload.continent
+        : null;
+
       room.state     = 'in-progress';
       room.date      = todayStr();
-      // Random per-room seed so competition locations differ from the daily puzzle
-      room.locations = getLocationsForDate(randomSeed());
+      room.continent = continent;
+      if (continent) {
+        const seed = Math.floor(Math.random() * 0xffffffff);
+        room.locations = getLocationsForContinent(continent, seed);
+      } else {
+        // Random per-room seed so competition locations differ from the daily puzzle
+        room.locations = getLocationsForDate(randomSeed());
+      }
 
       io.to(room.code).emit('game:starting', { rounds: room.locations.length });
       setTimeout(() => startRound(io, room, 0), 3000);

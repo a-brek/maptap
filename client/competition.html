@@ -179,6 +179,30 @@
       background: rgba(0,201,167,0.12);
     }
 
+    .continent-picker {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .continent-btn {
+      padding: 6px 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.18);
+      color: var(--text-muted, rgba(255,255,255,0.5));
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .continent-btn:hover { border-color: var(--teal); color: var(--teal); }
+    .continent-btn.active {
+      border-color: var(--teal);
+      color: var(--teal);
+      background: rgba(0,201,167,0.12);
+    }
+
     .player-list {
       list-style: none;
       padding: 0;
@@ -463,6 +487,11 @@
     }
     .breakdown-table td.bd-no-guess { color: var(--text-dim); font-style: italic; }
     .breakdown-table td.bd-total { color: var(--amber); }
+    @media (max-width: 480px) {
+      .breakdown-table { font-size: 9px; }
+      .breakdown-table th, .breakdown-table td { padding: 2px 3px; }
+      .breakdown-table .bd-dist-col { display: none; }
+    }
 
     /* ── Share + leaderboard section ── */
     .final-share-row {
@@ -515,17 +544,35 @@
       align-items: center;
       justify-content: center;
       z-index: 150;
+      padding: 16px;
+      box-sizing: border-box;
+      overflow-y: auto;
     }
     #comp-game-over[hidden] { display: none; }
 
     .final-card {
-      width: min(500px, calc(100vw - 32px));
+      width: min(500px, 100%);
       background: var(--bg-panel, #0e1420);
       border: 1px solid var(--border-hi);
       padding: 28px 24px;
       display: flex;
       flex-direction: column;
       gap: 16px;
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
+      box-sizing: border-box;
+      flex-shrink: 0;
+    }
+    @media (max-width: 600px) {
+      #comp-game-over {
+        align-items: flex-start;
+        padding: 8px;
+      }
+      .final-card {
+        padding: 18px 14px;
+        gap: 12px;
+        max-height: calc(100dvh - 16px);
+      }
     }
     .final-title {
       font-family: var(--font-display);
@@ -760,6 +807,18 @@
             <button class="duration-btn active" data-secs="10">10s</button>
             <button class="duration-btn" data-secs="12">12s</button>
             <button class="duration-btn" data-secs="15">15s</button>
+          </div>
+        </div>
+
+        <div id="continent-field" class="lobby-field host-only" hidden>
+          <div class="lobby-label">Continent filter (optional)</div>
+          <div class="continent-picker">
+            <button class="continent-btn active" data-continent="">All</button>
+            <button class="continent-btn" data-continent="Africa">Africa</button>
+            <button class="continent-btn" data-continent="Asia">Asia</button>
+            <button class="continent-btn" data-continent="Europe">Europe</button>
+            <button class="continent-btn" data-continent="North America">Americas</button>
+            <button class="continent-btn" data-continent="Oceania">Oceania</button>
           </div>
         </div>
 
